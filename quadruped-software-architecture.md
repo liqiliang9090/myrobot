@@ -2,11 +2,12 @@
 
 | 文档信息 | |
 |---|---|
-| 版本 | v1.0（初稿完成） |
+| 版本 | v1.1 |
 | 日期 | 2026-10-22 |
-| 状态 | 业界调研（8 家产品 + 5 类学术开源）+ 共性分析 + 目标架构推导 全部完成 |
+| 状态 | 业界调研（8 家产品 + 5 类学术开源）+ 共性分析 + 目标架构推导 完成；v1.1 基于 T1 发货后的补充调研修订 |
+| v1.1 修订 | ① 修正 T1 中间件事实：FastDDS（rmw_fastrtps_cpp）而非 CycloneDDS、消息包 aimdk_msgs 而非 the_dog_msgs、SDK 接口为标准 ROS2 Topic/Service（SetMcAction 等）；② 新增 2.2.6「T1 与 T1 Pro：同一套架构、按算力档位裁剪」；③ 目标架构锚定 T1 Pro 级参考配置（Orin Nano 级智能域 + 纯视觉/ToF + 轮足双形态），档位差异化收敛为"感知功能开关 + 接口开放深度"两个正交旋钮 |
 | 关联文档 | [embodied-ai-analysis.md](embodied-ai-analysis.md)（公司与产品级分析） |
-| 备注 | 启元 T1 底层细节部分来自第三方对官方 SDK 的解读与智元同源体系推断，文中以〔解读〕〔推测〕标注；引用数字请以官方最新披露为准 |
+| 备注 | 启元 T1 底层细节主要来自第三方对官方 SDK v1.0.0.0 的架构解读（CSDN/DAMO，2026-10-17）与智元同源体系推断，文中以〔解读〕〔推测〕标注；截至 2026-10 无拆机报告，型号功能差异以官网星号脚注为准 |
 
 ---
 
@@ -134,8 +135,8 @@ flowchart TB
 
 计算平台为**双板架构**〔解读+官方部分确认〕：
 
-- **低位机（实时运动控制板）**：独立运控板，运行平衡 / WBC / 关节伺服实时闭环；"全栈自研覆盖本体、运动控制、多模态感知交互"〔官方发布会〕。
-- **高位机（智能主控板）**：Pro 版为 Orin Nano（~40 TOPS）；基础版为 RK3588（8 核 A76/A55 + 6 TOPS NPU）〔解读，待官方确认〕。板间 2.5Gbps 链路下发指令、回收状态〔解读〕。
+- **低位机（实时运动控制板）**：独立运控板，IP 10.1.1.100，含 HAL 硬件抽象 + MC 运动控制 + 交互服务，运行平衡 / WBC / 关节伺服实时闭环；"全栈自研覆盖本体、运动控制、多模态感知交互"〔官方发布会〕。**两型号低位机完全相同**（见 2.2.6）。
+- **高位机（智能主控板）**：IP 10.1.1.101，与低位机 ROS2 通信〔解读〕。SDK 文档原文只写"基于 NVIDIA Orin 或 RK 平台"：Pro 版为 Orin Nano（~40 TOPS，媒体通稿确认）；基础版为 RK 平台（具体型号未公开，推断 RK3588 级 ~6 TOPS）〔解读+推测〕。板间 2.5Gbps 链路〔解读〕。
 
 传感器：5 组 ToF + 双目深度相机 + 2 鱼眼环视，Pro 版"9 传感器、双形态 360° 避障"〔解读/官方〕；**无激光雷达**（纯视觉+ToF 路线）；IMU、麦克风阵列、RGB 灯带、探照灯。关键事实：**轮子为被动轮（脚轮），无轮毂电机、无轮编码器**〔解读，URDF 佐证〕——轮足形态的定位依赖腿运动学 + 视觉〔推测〕。
 
@@ -164,15 +165,16 @@ flowchart TB
             APP["语音交互 / 身份识别 / 智能跟随<br/>拍摄运镜 / 导航回充"]
         end
         subgraph L2["L2 中间件层（ROS 2 Humble）"]
-            DDS["DDS（发行版推测 CycloneDDS）"]
-            MSG["自定义消息 the_dog_msgs<br/>关节指令 / 关节状态 / 模型预测"]
+            DDS["FastDDS（rmw_fastrtps_cpp）<br/>调优：20M UDP 缓冲 · 20G 共享内存 · 网卡白名单"]
+            MSG["aimdk_msgs 六子模块<br/>hal / mc / interaction / agent / config / common<br/>话题：/aima/hal/*、/aima/mc/*、/interaction/*"]
+            YAMO["yamo 进程管理（容器化）<br/>Basic / Advanced 两级开发模式"]
         end
     end
 
     subgraph MCU["低位机（实时运控板，RTOS）"]
-        L1["L1 实时运控层：PrimeMotion<br/>柔顺安全小脑运控模型"]
-        WBC["轮足平衡 / 四足步态 / 形态切换状态机<br/>（RL 策略 + 安全约束，推测）"]
-        SRV["关节伺服闭环（不开放底层写权限）"]
+        L1["L1 实时运控层：PrimeMotion<br/>多专家混合 RL（基础运动/柔顺/安全）"]
+        WBC["HAL 硬件抽象 + MC 运动控制：<br/>动作状态机（101 四足站立/201 双足站立/202 双足行走/<br/>300 全身控制/形态切换 10/20，BFS 合法路径）<br/>SetMcInputSource 输入源仲裁（1000ms 超时脱锁）<br/>Ruckig 500Hz 在线轨迹限幅"]
+        SRV["关节伺服闭环（stiffness/damping 阻抗指令<br/>不开放底层写权限）"]
     end
 
     L0["L0 执行器层：QDD 准直驱力控关节 ×N<br/>被动轮 · 灯/声/探照灯"]
@@ -192,8 +194,8 @@ flowchart TB
 | 层 | 关键模块 | 说明 |
 |---|---|---|
 | L0 执行器 | QDD"蛋壳"关节、被动脚轮、灯/声 | 关节轻量高刚性，力控柔顺；DOF 数未公布（Q1 为 22 DOF 可类比） |
-| L1 实时运控 | PrimeMotion"小脑" | 官方定义"柔顺安全小脑运控模型"；SDK **不开放底层电流/位置伺服写权限**，闭环完全由低位机保证 |
-| L2 中间件 | ROS 2 Humble + the_dog_msgs | ament_cmake + rclpy；同源体系有智元 AimRT 中间件（ros2/grpc/mqtt/http 后端可插拔，T1 是否直接采用未确认） |
+| L1 实时运控 | PrimeMotion"小脑" | 官方定义"多专家混合 RL 模型（基础运动、柔顺、安全）"，遇外力顺势、倾倒/被拎起即停；SDK **不开放底层电流/位置伺服写权限**，闭环完全由低位机保证；关节指令带 stiffness/damping 阻抗参数 |
+| L2 中间件 | ROS 2 Humble + **FastDDS** + aimdk_msgs | rmw_fastrtps_cpp；aimdk_msgs 六子模块；yamo 容器化进程管理；官方三套 Docker 工具链（ARM 原生/x86 交叉/x86 原生）跨 Orin/RK 平台；同源体系有智元 AimRT 中间件（T1 是否直接采用未确认） |
 | L3 智能应用 | 语音/跟随/运镜/回充 | 消费场景功能 |
 | L4 模型层 | PrimeGo / PrimeVesta / PrimeMind | PrimeGo 明确"双形态统一"感知策略；训练数据=真机+UMI+真实家务视频 |
 | L5 Agent/生态 | Harness Agent、RPK、PrimeStore | 技能做成 UGC 分发单元；Playground 先仿真后真机 |
@@ -201,8 +203,8 @@ flowchart TB
 
 #### 2.2.4 控制流与数据流
 
-- **下行**：语音/App/Agent 任务 →（L5/L3）解析为动作意图 → `t1_motion/t1_action`（行走/转向/预置动作/关节轨迹）→ DDS → 低位机 PrimeMotion（平衡+WBC，推测含 body twist→关节速度的雅可比转换）→ 关节电流环。
-- **上行**：关节状态/IMU/ToF/双目/鱼眼 → the_dog_msgs 话题 → PrimeGo 跟随/避障/VSLAM → 状态聚合 → App/云端。
+- **下行**：语音/App/Agent 任务 →（L5/L3）解析为动作意图 → 标准 ROS2 Topic/Service（`SetMcAction`/`SetMcPresetMotion`/轮足速度控制等；动作状态机校验合法路径，两次指令间隔 ≥0.5s，<500ms 报 -10001）→ FastDDS → 低位机 PrimeMotion（平衡+WBC）→ 关节伺服。
+- **上行**：关节状态/IMU/ToF/双目/鱼眼 → aimdk_msgs 话题（传感器流 BEST_EFFORT+VOLATILE+KEEP_LAST(10)）→ PrimeGo 跟随/避障/VSLAM → 状态聚合 → App/云端。
 - **形态切换**：路况判定（感知层）或低电量触发 → 低位机执行约 3.5s 变形动作序列（状态机+全身轨迹〔推测〕）；**低电量自动切四足趴下防摔**——消费级软硬协同安全的典型案例。
 
 #### 2.2.5 轮足特有问题与 T1 的解法
@@ -211,12 +213,33 @@ flowchart TB
 2. **跨形态一体**："Transformer 跨形态一体架构"（营销命名）= 同一本体、单一运动技能体系覆盖双形态，与 LimX"同一套核心算法适配多形态"理念同向。
 3. **安全设计**：低电量自动变形保护；技能开发链路"Playground 仿真先行，RPK 验证后才上真机"。
 
-#### 2.2.6 对本设计的启示
+#### 2.2.6 T1 与 T1 Pro：同一套架构，按算力档位裁剪功能
+
+**结论：两型号为同一套软件架构，不存在架构性分叉**〔基于官网脚注 + SDK 文档 + 第三方架构解读的综合判断〕：
+
+| 维度 | T1 基础版 | T1 Pro | 标注 |
+|---|---|---|---|
+| 低位机（运控板 + PrimeMotion） | 完全相同（运动参数一致：四足 3m/s/轮足 2.5m/s/30° 坡/15cm 越障；整机仅差 0.5kg，集中在头部算力模组） | 完全相同 | 〔官方〕 |
+| 高位机 SoC | RK 平台（~6 TOPS 级） | Orin Nano（~40 TOPS） | 〔官方"Orin 或 RK"+媒体〕 |
+| 软件栈 | **同一套**：ROS 2 Humble + FastDDS + aimdk_msgs + yamo + RPK 运行时；官方 Docker 工具链同时支持 Orin/RK 编译目标，开发者代码不分叉 | 同左 | 〔解读，SDK 文档〕 |
+| 360° 全向感知融合、VSLAM 建图与回充导航、运镜/环绕/多机位拍摄、侧后向跟随、自动场景变形（OTA）、语音召唤、跟随载物、Insta360 协同 | ✗ | ✓（官网星号 Pro 独占） | 〔官方脚注〕 |
+| 基础能力（两型号均有） | 主动避障、身份识别（人脸+声纹）、前向跟随、手动变形、语音交互/长期记忆、图形化编程、拖拽示教、多专家 RL 柔顺运控 | ✓ | 〔官方〕 |
+| SDK 深度二次开发 | 官网"二次开发"带 Pro 星号——若严格按脚注，深度 SDK 为 Pro 独占，基础版为零代码编排/图形化编程（与 Q1"SDK/HDK 仅探索版提供"的分层一致；与开发者社区口径存在张力，待验证） | ✓ | 〔官方脚注+解读〕 |
+| RPK 技能包 | 跨 Q1/T1/T1 Pro 通用（manifest 声明目标机型与权限/安全参数） | 同左 | 〔解读〕 |
+
+档位差异的本质是 **NPU 算力决定的功能开关**：6 TOPS 足够跑语音交互、单目标跟随、ToF 避障等轻感知；360° 多传感融合、VSLAM 回充、边走边拍的实时构图、变形前"全方位扫描地面预判风险"等重感知能力是 40 TOPS 档独占〔解读+推测〕。这验证了"**同一架构 + 算力档位 + 功能开关**"的产品分层路线（与宇树 Go2 AIR→EDU 同构，但宇树按档位开放接口深度，启元按档位开放感知功能）。
+
+注：截至 2026-10 尚无完整拆机报告，功能差异以官网星号脚注为准；基础版 SoC 具体型号、基础版传感配置是否减配均待验证。
+
+#### 2.2.7 对本设计的启示
 
 - 双板（高低位机）+ 板间高带宽链路是轮足/消费级产品验证过的算力拓扑；
 - "小脑完全封闭 + 技能包生态开放"的分级开放策略，兼顾安全与生态；
 - 形态切换必须有独立的状态机与触发安全策略（电量、地形）；
-- 同一感知模型需覆盖多形态（PrimeGo 双形态统一）。
+- 同一感知模型需覆盖多形态（PrimeGo 双形态统一）；
+- **同一架构跨两档 SoC 交付已量产验证**：低位机不动、高位机换档、功能开关裁剪——"一架构多档位"不是设计理想而是行业现实；
+- T1 的工程细节为本书目标架构提供了三处直接范本：动作状态机 + BFS 合法路径 + 指令间隔防抖（→ 4.5-D 仲裁与安全）；SetMcInputSource 输入源仲裁（优先级 + 1000ms 超时脱锁，→ 4.5-D）；RPK manifest 内嵌 capabilities 权限声明与 safety 参数（限速、电量阈值 20%–25%，→ 4.5-G 技能分发）；
+- Ruckig 在线轨迹限幅（500Hz）是"关节目标流"的标准化安全护栏，值得纳入统一执行层。
 
 ### 2.3 Boston Dynamics Spot
 
@@ -413,7 +436,7 @@ Isaac Gym/Isaac Lab 并行训练（4096–8192 envs，PPO/AMP，域随机化+执
 | 产品 | 实时链路 | 服务/应用链路 | 对外/生态链路 |
 |---|---|---|---|
 | 宇树 Go2 | CAN→主控板；DDS rt/lowcmd 500Hz | DDS（CycloneDDS，Domain 0，rt/lf 前缀） | SDK2/ROS2 零桥接 + WebRTC App + MQTT 云 |
-| 启元 T1 | 板间 2.5Gbps→低位机闭环 | ROS 2 Humble + the_dog_msgs | RPK 技能包 + WorkBuddy 云脑 |
+| 启元 T1/Pro | 板间 2.5Gbps→低位机闭环（两型号同低位机） | ROS 2 Humble + FastDDS + aimdk_msgs（/aima/* 话题） | RPK 技能包 + WorkBuddy 云脑；深度 SDK 按 Pro 档开放 |
 | Spot | 封闭 body control | 内部未公开 | gRPC/Protobuf 微服务 + Docker 载荷 + Orbit |
 | ANYmal/ETH | EtherCAT + RT-Linux（XDDP，推测） | ROS（研究栈） | gRPC/REST（商业 ANYmal API） |
 | 小米 CyberDog2 | LCM（NX↔M813，500ms 超时趴下） | ROS 2 + Manager/Core/Actuator 构件 | gRPC App + 可视化编程 |
@@ -442,10 +465,10 @@ Isaac Gym/Isaac Lab 并行训练（4096–8192 envs，PPO/AMP，域随机化+执
 |---|---|---|---|---|---|
 | 计算拓扑 | 主控板(MCU) + 板载 Linux + 可选 Jetson 坞 | 低位机 RT 板 + 高位机（Orin Nano/RK3588）双板 | 封闭本体 + CORE I/O 载荷(Xavier NX) | 双 i7 + Jetson + EtherCAT 从站 | 单 PC + EtherCAT |
 | 实时层隔离 | 主控板独立 MCU，超时自动阻尼 | 低位机独立闭环，不开放底层写 | body control 完全封闭 | RT-Linux 独域 + XDDP | RT 线程 + EtherCAT |
-| 对外接口 | DDS 直通（rt/ 前缀）+ SDK2 + ROS2 零桥接 | ROS2 Humble + the_dog_msgs + RPK 技能包 | gRPC/Protobuf 微服务 + Docker 载荷 | gRPC/REST（商业）/ ROS（研究） | LCM / ROS |
+| 对外接口 | DDS 直通（rt/ 前缀）+ SDK2 + ROS2 零桥接 | ROS2 Humble + FastDDS + aimdk_msgs + RPK 技能包 | gRPC/Protobuf 微服务 + Docker 载荷 | gRPC/REST（商业）/ ROS（研究） | LCM / ROS |
 | 低层开放度 | EDU 开放力矩 500Hz | 不开放（小脑封闭） | Beta 受控开放 100–333Hz | 研究版全开放 | 完全开源 |
 | 高层抽象 | SportClient 30+ 技能 RPC | t1_motion/action + RPK 技能 | Robot Command + Missions 行为树 | 任务步描述（free_gait） | 无（研究裸接口） |
-| 控制权管理 | MotionSwitcher + lease + silent | 技能包沙箱 + Playground 先行 | Lease + E-Stop keepalive + end_time | 实验室人工管理 | 心跳超时 |
+| 控制权管理 | MotionSwitcher + lease + silent | SetMcInputSource 输入源仲裁（1s 超时脱锁）+ RPK 沙箱先行 | Lease + E-Stop keepalive + end_time | 实验室人工管理 | 心跳超时 |
 | 频率金字塔 | 500Hz 低层 / 800Hz 电机 / ~12Hz 点云 | 板间 2.5Gbps，低层闭环频率未公开 | 指令短有效期；RL Kit 50Hz+PD200Hz | 20Hz 感知→100Hz NMPC→400Hz WBC | 20–30Hz MPC→1kHz WBC |
 | 仿真同构 | mujoco 复刻 DDS topic，换域名即切换 | Playground（Isaac/Genie Sim 生态） | 有仿真 API 但不同构 | Gazebo 研究栈同构 | Gazebo/IsaacGym |
 | 安全兜底 | CRC32+超时阻尼+bit_flag（固件） | 低电量自动变形保护（固件层） | Comms Loss 坐下断电（固件） | 反应行为+动量观测器（控制层） | 心跳+分级增益（软件层） |
@@ -463,7 +486,7 @@ Isaac Gym/Isaac Lab 并行训练（4096–8192 envs，PPO/AMP，域随机化+执
 商业产品的低层力矩接口要么封闭（T1、Spot 标准版）、要么受控开放（Go2 EDU、Spot Joint Control Beta）。开放面收敛在两层：高层技能 API（SportClient、Robot Command、RPK）和应用计算平台（Jetson 坞、CORE I/O、RPK 沙箱）。宇树的档位解锁（AIR→EDU）证明这是商业策略而非技术限制。
 
 **共性 4：控制权单租约 + 指令时效 + 心跳兜底。**
-多控制源并存（遥控/导航/语音/App/开发者程序）是常态，所有产品都有控制权裁决机制：Spot 的 Lease+E-Stop keepalive+指令 end_time；宇树的 MotionSwitcher/lease（3107/3207 错误码）+ 命令断流自动阻尼；小米的**数值化指令优先级** App(0)<语音(1)<视觉(2)<手柄(3)<算法(4) + 200ms 伺服指令时效；云深处的 >50ms 丢权/>1s 阻尼；CMU 栈的心跳 0.2s 超时。**裁决点位于服务层，兜底位于固件层**。
+多控制源并存（遥控/导航/语音/App/开发者程序）是常态，所有产品都有控制权裁决机制：Spot 的 Lease+E-Stop keepalive+指令 end_time；宇树的 MotionSwitcher/lease（3107/3207 错误码）+ 命令断流自动阻尼；小米的**数值化指令优先级** App(0)<语音(1)<视觉(2)<手柄(3)<算法(4) + 200ms 伺服指令时效；启元的 SetMcInputSource 输入源仲裁（优先级 + 1000ms 超时脱锁）；云深处的 >50ms 丢权/>1s 阻尼；CMU 栈的心跳 0.2s 超时。**裁决点位于服务层，兜底位于固件层**。
 
 **共性 5：低层安全兜底下沉到固件，与上层软件质量解耦。**
 CRC/帧头校验（Go2）、命令超时→阻尼（Go2/学术栈）、姿态超限→阻尼（宇树 state_machine 框架）、Comms Loss→坐下断电（Spot）、低电量→自动变形防摔（T1）。上层进程崩溃/断网的最坏结果是"机器人安全趴下"，而不是失控。
@@ -511,6 +534,8 @@ Go2 mujoco 实现实机 DDS topic（换 Domain 即切换）；LimX 仿真器/控
 | 共性7 技能化 + R3 | 技能作为一等公民对象（可组合、可分发、可权限管理） | SportClient、RPK、.spx |
 | 分化点3 感知路线 + R2 | 感知层传感器插件化，激光/视觉可裁剪（同架构覆盖消费与行业版） | T1 纯视觉 vs Go2/云深处激光 |
 | 轮足特有（3.3-5） | 实时域内设**构型状态机**；状态估计预留轮里程计融合插槽 | T1 低电量变形、LimX TRON1 换足识别 |
+
+**型号档位基线（以 T1 Pro 级为参考锚点）**：目标架构按 T1 Pro 级配置锚定——智能域 Orin Nano 级（~40 TOPS）+ 纯视觉/ToF 多传感（无激光雷达）+ 轮足双形态 + 端云分工（云脑可插拔）。基础档（RK3588 级 ~6 TOPS）与 Pro 档**共用同一架构，仅以功能开关裁剪**（360° 融合感知、VSLAM 回充、运镜拍摄等重感知功能为高算力档独占）。启元 T1/T1 Pro 的产品实践（同一套 ROS2+FastDDS+aimdk_msgs 栈跑两档 SoC、低位机完全相同、RPK 跨型号通用）已验证"一架构多档位"路线在消费级量产的可行性；宇树 Go2 则从接口开放深度维度验证了同一路线。本架构的档位差异化收敛在两处旋钮：**感知功能开关**（启元模式）与**接口开放深度**（宇树模式），二者正交可叠加。
 
 ### 4.2 目标架构总图：「双域五层、一总线、安全纵贯」
 
@@ -652,7 +677,7 @@ sequenceDiagram
 实时域↔智能域、智能域内部服务间，统一 CycloneDDS 总线：`rt/` 前缀高频流（best_effort + keep_last(1)）、`lf/` 前缀低频状态流（供 App/监控/云端，学 Go2）、事件类走 reliable；IDL 即 ROS2 msg，开发者用 ROS2 直连零桥接（学 Go2，获科研生态）；对外部 App/云/行业集成由 L4 网关转 gRPC/HTTPS/WebRTC/MQTT（学 Spot，获行业生态）。**ROS2 进程不进实时域**——实时域内是裸 DDS/共享内存，规避 ROS2 executor 抖动。
 
 **D. 安全纵贯链与分级降级。**
-五级 watchdog 层层独立：L0 关节看门狗（电流/温度/限位）→ L1 命令断流阻尼 + 姿态超限保护 + 力矩包络 → L2 仲裁时效与租约（100–200ms）→ L4 网关鉴权与限流 → 硬件 E-Stop 独立电路（不经任何软件）。降级阶梯：限速→减幅→阻尼→趴下→断电；每级触发条件、恢复动作（RecoveryStand）显式状态机化。轮足特有：**低电量自动切四足降重心**（学 T1）。
+五级 watchdog 层层独立：L0 关节看门狗（电流/温度/限位）→ L1 命令断流阻尼 + 姿态超限保护 + 力矩包络 + 在线轨迹限幅（Ruckig 类，学 T1 的 500Hz 轨迹护栏）→ L2 仲裁时效与租约（100–1000ms，学 CyberDog 200ms / 启元 1000ms 分层）+ 动作状态机合法路径校验（学 T1 BFS 状态机 + 指令间隔防抖）→ L4 网关鉴权与限流 → 硬件 E-Stop 独立电路（不经任何软件）。降级阶梯：限速→减幅→阻尼→趴下→断电；每级触发条件、恢复动作（RecoveryStand）显式状态机化。轮足特有：**低电量自动切四足降重心**（学 T1，且电量阈值下沉为技能 manifest 安全参数——学 T1 RPK 的 safety 字段）。
 
 **E. 构型状态机（轮足/可变形构型的核心增量）。**
 在 L1 步态调度器之上扩展为构型状态机：`四足 / 轮足 / 变形中 / 趴伏 / 恢复`。变形 = 预编排全身动作序列（离线优化/示教获得，WBC 跟踪执行），**入口设前置条件检查**（电量阈值、地形平坦度、当前姿态），出口设失败回退（中断变形回到稳定构型）。构型作为一等参数贯穿：状态估计切换（足式里程计 ⇄ 轮式+足式融合）、策略插件切换、感知参数切换（相机外参随形态变化）——对应 T1"跨形态一体"与 LimX"换足硬件识别+模式自动切换"的通用化。
@@ -671,7 +696,7 @@ sequenceDiagram
 1. **安全性不依赖软件质量上限**：最坏情况（上层全崩/断网）= 机器人安全趴下，固件层兜底（共性 5 的直接继承）。
 2. **科研生态借力**：DDS+ROS2 零桥接 = 直接继承 Go2 级全球社区效应，学生/研究者上手成本最低（差异化于 Spot 的 gRPC 封闭路线）。
 3. **算法演进不伤架构**：经典 MPC→RL 策略→端到端 VLA，都只是"策略插件"或"L4 模型"的替换；执行层与安全链十年不动。
-4. **一架构多构型多档位**：四足/轮足/（延伸双足）同一骨架；消费版（封闭小脑+技能包）与 EDU 版（开放力矩）按档位解锁（学宇树 AIR→EDU）。
+4. **一架构多构型多档位**：四足/轮足/（延伸双足）同一骨架；消费版（封闭小脑+技能包）与 EDU 版（开放力矩）按档位解锁（学宇树 AIR→EDU）；同架构跨两档 SoC 交付已由启元 T1/T1 Pro 量产验证（感知功能开关裁剪，见 2.2.6）。
 5. **Sim2Real 零成本**：仿真同构 + ONNX 交换格式，策略迭代以天为单位（而非重新适配接口）。
 6. **供应链解耦**：MCU/SoC/总线/DDS 实现/推理引擎皆可替换（实时域接口不依赖具体芯片；RK3588 消费版与 Orin 行业版共存）。
 
@@ -719,7 +744,7 @@ flowchart LR
 |---|---|---|
 | 实时域 OS | RTOS（FreeRTOS/Xenomai）或 PREEMPT_RT | 500Hz–1kHz 确定性；循环抖动目标 <100µs |
 | 关节总线 | **CAN-FD**（消费/中端）或 **EtherCAT**（行业/高动态） | CAN-FD：BOM 低、布线简单、生态（CyberGear/宇树电机）成熟，1MHz→5MHz 数据速率下 12 关节 1kHz 可行；EtherCAT：确定性/带宽/拓扑更优（ANYmal/MIT/legged_control 路线），但主站复杂、线缆连接器成本高 |
-| DDS | CycloneDDS | Go2 同款，与 ROS2 默认 RMW 一致；注意多 DDS 实现共存冲突（社区踩坑：unitree_sdk2 与某些 ROS2 栈需换 FastDDS），全机统一实现 |
+| DDS | CycloneDDS（或 FastDDS，二选一全机统一） | CycloneDDS：Go2 同款、ROS2 默认 RMW 之一；FastDDS：启元 T1 系同款（rmw_fastrtps_cpp + 20M UDP 缓冲/20G 共享内存调优先例）。两者皆可，关键是**全机统一实现并按带宽调优**；注意多 DDS 实现共存冲突（社区踩坑：unitree_sdk2 与某些 ROS2 栈需换 FastDDS） |
 | 智能域框架 | ROS 2 Humble（组件化节点） | 生态最大（Nav2/视觉栈）；仅智能域使用 |
 | 策略推理 | ONNX Runtime（NVIDIA→TensorRT；RK→RKNN/MNN） | ONNX 为行业交换格式（LimX/云深处/众擎惯例） |
 | 训练仿真 | Isaac Lab（训练）+ MuJoCo（sim2sim/接口同构） | menagerie 提供模型起点；域随机化+执行器网络标配 |
@@ -763,11 +788,12 @@ flowchart LR
 - 第三方深度分析：boschko.ca/unitree-go2-rce（内部 67 topics 与网络结构）、simplexitypd.com 与 ifixit.com 拆解、ROS Discourse《New Implementation for Unitree GO2 in ROS2 Humble》
 - 算法血统：Di Carlo《Dynamic Locomotion in the MIT Cheetah 3 Through Convex MPC》(ICRA 2019)、Kim《Highly Dynamic Quadruped Locomotion via Whole-Body Impulse Control and Model Predictive Control》(arXiv:1909.06586)
 
-### 启元 T1
+### 启元 T1 / T1 Pro
 
-- 官方：primebot.com/t1.html、dev.primebot.com（DAMO 工作台）、primebot.com/allNews.html
-- 媒体：中国经济网（2026-09-21 发布会报道）、新华网（2026-07-14 WAIC 首发 / 2026-09-24 生态报道）、科技日报（2026-09-21）
-- 第三方解读：CSDN damodev《从双板硬件到 RPK 技能包》系列（署名"禁默"）
+- 官方：primebot.com/t1.html（两型号速览对比、`*`Pro 独占与 `**`OTA 渐开脚注、配件栏）、dev.primebot.com（SDK v1.0.0.0 / PrimeConsole / DAMO 工作台）、primebot.com/allNews.html
+- 技术解读（软件栈主要证据）：CSDN/DAMO《启元机器人技术架构解读：从双板硬件到 RPK 技能包》（damodev.csdn.net/6ad2fdb8536f457592b08401.html，2026-10-17，配套 AtomGit PRIMEBOT 组织仓库）
+- 媒体：中国经济网（2026-09-21 发布会）、新华网（2026-07-14 WAIC / 2026-09-24 生态）、科技日报、盖世汽车 gasgoo.com/robot/news/70472708、腾讯新闻交付报道（2026-10-18）
+- 数据/论文：HuggingFace challenge-2026/challenge_data（LeRobot V2.1，500h+ 真机遥操作 + ~200h UMI，89 维状态/25 维动作@30Hz）、arXiv:2609.03591
 - 智元同源体系：docs.aimrt.org（AimRT）、灵渠OS Alpha 开源（2026-03）、agibot-world.com（AgiBot World / Genie Sim 3.0）、GO-1（ViLLA，IROS 最佳论文）
 - 对照：limxdynamics.com（W1/P1 COSA）、RSL ETH ANYmal on wheels（Bjelonic，ICRA 2020 WBMPC）、Bellegardo 被动轮轨迹优化（CDC 2019）、Frontiers 2026《Passive wheels on legged robots: a survey》
 
