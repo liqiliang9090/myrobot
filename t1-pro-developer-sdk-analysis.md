@@ -1,0 +1,677 @@
+# 启元 T1 Pro 开发者文档与 SDK 深度分析：能力·接口·软件模块·端到端推导
+
+| 文档信息 | |
+|---|---|
+| 版本 | v1.0 |
+| 日期 | 2026-10-24 |
+| 分析对象 | 启元 T1 / T1 Pro（官方 SDK 不区分型号，单一 T1 SDK 覆盖两档硬件；T1 Pro 差异在产品功能层，见 §1.6） |
+| 主要信源 | 官方 SDK 仓库 atomgit.com/primebot/**t1-sdk**（2026-10-24 克隆）：《接口说明.md》14064 行、《PrimeBot_SDK快速入门与集成指南.md》1178 行、aimdk_msgs 消息源码（62 个 .msg/.srv）、examples（18 个场景例程 × C++/Python 双语言）；辅以 primebot.com 产品页与官方发布会口径（已经 [quadruped-software-architecture.md](quadruped-software-architecture.md) v1.2 逐条核验） |
+| 证据标注 | 〔官方〕= SDK/官方文档明文；〔推导〕= 由官方证据链严格推出（证据随文标注）；〔推测〕= 基于技术体系的合理推断，无直接官方证据 |
+| 关联文档 | [quadruped-software-architecture.md](quadruped-software-architecture.md)（业界调研与目标架构，v1.2）；[embodied-ai-analysis.md](embodied-ai-analysis.md)（公司与产品级分析） |
+
+---
+
+## 一、T1 Pro 提供的能力全景
+
+### 1.1 能力分类总表
+
+| 能力域 | 能力项 | 规模/规格 | 证据 |
+|---|---|---|---|
+| **运动-高层** | 运动模式（Action）状态机 | **41 个** McAction 枚举（急停 2 / 四足段 21 / 双足段 12 / 变形 4 / 上肢 1 / 起始 1），按合法拓扑切换 | 〔官方〕 |
+| | 全身动作（Motion，神经网络驱动） | **20 个** MIMIC 动作（基于 .onnx 推理模型；四足跳舞×2、律动×2、说话×5、情感×N、双足滑冰 30s 等） | 〔官方〕 |
+| | 预设动作（PresetMotion，关键帧轨迹） | **69 个**预设动画（挥手/比心/拍照/拥抱/思考/转圈/破冰舞蹈/全身跳舞…），另支持自定义 .csv 轨迹（120fps 固定采样率） | 〔官方〕 |
+| | 连续速度控制 | 平移/侧移/转向/机身高度，50–100Hz 指令流 | 〔官方〕 |
+| | 自定义上肢控制 | 双足形态上肢 6 关节 100Hz 连续目标流 | 〔官方〕 |
+| **运动-低层** | 全身关节直控 | 14 关节（位置/速度/力矩 + stiffness/damping 阻抗），500–1000Hz，Ruckig 在线限幅，单帧步进 ≤0.2rad | 〔官方〕 |
+| | 关节状态反馈 | 500Hz 全量上报（位置/速度/力矩/线圈温度/电机温度/电压） | 〔官方〕 |
+| **交互-语音出** | TTS 语音合成 | 流式合成，**8 级优先级（L1–L10）+ 0–99 子权重**（最终权重=主级×100+子权），抢占/排队双模式仲裁 | 〔官方〕 |
+| | 音频文件播放 | 本地文件 + PulseAudio media.role 四档（Alert/Notification/Communication/Music，自动 duck 压低音乐） | 〔官方〕 |
+| | TCP 音频直连 | 播放 6001 端口（48kHz/mono/S16LE）、录音 4713 端口（**8 声道 48kHz**：ch1–2 回采 + ch3–8 麦克，ch5–6 主拾音） | 〔官方〕 |
+| **交互-语音入** | 语音识别（ASR） | /aima/agent/asr_result 话题：中间/最终结果、置信度、event_id 上下文关联、语言标签 | 〔官方〕 |
+| | 音量/静音管理 | 查询/设置音量（0–100，持久化）、物理功放级静音 | 〔官方〕 |
+| **交互-视觉出** | 屏幕表情 | **23 种**内置表情（平静/喜悦/害怕/难过/聆听/思考/说话态…）+ mp4 视频播放（优先级+循环次数） | 〔官方〕 |
+| **交互-灯效** | 灯带/颈灯 | **23 种**灯效模式（含变形指示、充电、低电量、故障）+ 自定义 RGB/周期（呼吸/闪烁） | 〔官方〕 |
+| **交互-触觉** | 触摸感知 | 背部/胸部传感器，单击~六击 + 左右滑动共 10 种事件 | 〔官方〕 |
+| **感知-视觉** | 头部双目相机 | head_stereo_left/right：单帧 JPEG 抓拍（~1fps）+ RTSP 连续流（rtsp://10.1.1.100:2554/live_*） | 〔官方〕 |
+| | 变形舵机 | 位置 0–90°（0=四足位、90=双足位），速度 100–1000 步/s | 〔官方〕 |
+| **硬件状态** | 电源管理 | BMS 全量数据：电压/电流/功率/温度/SOC/循环次数 + **29 个状态位**（充放电/过压/欠流/MOSFET/无线充电…） | 〔官方〕 |
+| **系统** | 主动关机 | task engine 层 ShutdownTask 服务 | 〔官方〕 |
+| | 进程自启动 | yamo 进程管理：开机自启动接入、两阶段启动（1500ms/8000ms）、cgroup 分组 | 〔官方〕 |
+
+### 1.2 运动能力细节（SDK 全量口径）
+
+**动作状态机（41 态）的拓扑要点**〔官方〕：
+
+- 入口为 `PASSIVE_DEFAULT`（零力矩急停），可直达四足趴下/坐下/站立/恢复、双足恢复、阻尼急停；
+- `DAMPING_DEFAULT`（阻尼急停）⇄ `PASSIVE_DEFAULT` 可互切；**任何状态可直达双急停**；
+- 四足链：站立 → 基础运动（行走/奔跑/越障）→ 技能类（舞蹈/握手/骄傲/愉快/伸展/跳跃/后空翻/仿生）→ 变形（→双足）；
+- 双足链：`BIPED_LOCOMOTION_WBC`（全身控制）为核心枢纽，⇄ 上肢自定义/动画模式，→ 基础运动（跑/越障/原地转/太空步）→ 技能 → 变形（→四足）；
+- **技能/变形/恢复类为过渡态，执行完自动回基础态**（MIMIC 类经 SetMcMotion 自动从 `QUADRUPED_LOCOMOTION_DEFAULT`/`BIPED_LOCOMOTION_WBC` 切入并切回）；
+- 非法拓扑切换被底层拦截；两次指令间隔 ≥500ms（否则 -10001）。
+
+**关节清单（14 自由度 + 主动轮）**〔官方〕：
+
+| 部位 | 关节 | 限位 (rad) | 峰值力矩 |
+|---|---|---|---|
+| 前左/前右腿（双足形态=手臂） | HIP_ROLL / HIP_PITCH / KNEE ×2 | roll ±0.47、pitch −1.22~4.36、knee ±2.62 | 60 N·m |
+| 后左/后右腿 | HIP_ROLL / HIP_PITCH / KNEE ×2 | roll ±1.57、pitch 0~π、knee −2.62~−0.17 | 60 N·m |
+| 后左/后右足端 | **FOOT（=主动轮，连续旋转）** ×2 | ±10.0（软件限位，注意线缆缠绕极限） | 60 N·m |
+
+**自定义动作资产管线**〔官方〕：`.csv` 轨迹（固定 10 列：双臂肩 pitch/roll/yaw + 肘 ×2 + 腰 roll/yaw；120fps）→ 三种来源：App"手把手教学"示教录制（存 `/robot/userdata/sd/custom_motions/`）、"灵创"工具、Blender 导出 → SetMcPresetMotion(ani_path) 加载强驱。
+
+### 1.3 产品级能力（官网口径，SDK 之外的面）
+
+| 类别 | 能力 | T1 基础版 | T1 Pro |
+|---|---|---|---|
+| 基础 | 主动避障、身份识别（人脸+声纹）、前向跟随、语音交互/长期记忆、图形化编程、拖拽示教、多专家 RL 柔顺运控 | ✓ | ✓ |
+| Pro 独占 | 360° 多传感融合避障、VSLAM 建图与自动回充、轨迹运镜/环绕/多机位拍摄、侧后向跟随、自动场景变形、语音召唤、跟随载物、后空翻（OTA）、USB 输出、蓝牙音箱、**深度二次开发** | ✗ | ✓ |
+| 云端生态 | 腾讯云 WorkBuddy 云端大脑（数万 Skill）、PrimeStore 技能商店 / PrimeHub（skillhub.primebot.com）、PrimeFLOW 外观平台、RPK 技能包分发 | 共有 | 共有 |
+
+〔官方产品页+发布会口径，经 v1.2 文档核验〕
+
+### 1.4 开发体系能力（开发者视角的"元能力"）
+
+| 项 | 内容 |
+|---|---|
+| 开发范式 | **ROS 2 Humble 原生**：SDK 即 aimdk_msgs 消息包 + 例程，无私有协议栈；`ros2 topic/service` 可直接调试 |
+| 部署位置 | 开发 PC（10.1.1.99）/ 运控板 / 大脑板 三处等价部署，FastDDS 局域网透明互联 |
+| 权限体系 | **五层**：运行模式（Standard/Develop）→ 开发方式（API 暂未支持 / ROS2）→ 开发层级（Basic 无损增强 / Advanced 深度接管）→ 领域设置 → 原子功能开关（当前仅 `domains.mc.low_level_dev` 低层运控） |
+| 工具链 | Docker ×2（x86 交叉编译 ARM / x86 原生）、colcon、Ruckig 源码包（C++/Python nanobind）、OpenCV 4.13 源码包 |
+| 运维通道 | SSH 密钥认证（两板密钥不同、售后发放）、/robot/software/ 模块部署、/robot/persist/{log,bag} 日志与数据包、yamo em doctor 状态检查 |
+| 仿真 | 官方 t1-urdf（STL + MuJoCo XML + RViz/Gazebo launch）；技能链路 --dry-run/--sim（MockPrimeBot） |
+
+---
+
+## 二、T1 Pro 开发接口全景（官方 SDK 面）
+
+### 2.1 接口总表（30 项）
+
+| # | 模块 | 接口名称 | 类型 | 消息类型 | QoS / 频率 | 方向 |
+|---|---|---|---|---|---|---|
+| 1 | 运控高层 | `/aimdk_5Fmsgs/srv/GetMcAction` | Service | GetMcAction | Reliable | Robot→Outer |
+| 2 | 运控高层 | `/aimdk_5Fmsgs/srv/SetMcAction` | Service | SetMcAction | Reliable | Outer→Robot |
+| 3 | 运控高层 | `/aimdk_5Fmsgs/srv/SetMcMotion` | Service | SetMcMotion | Reliable | Outer→Robot |
+| 4 | 运控高层 | `/aimdk_5Fmsgs/srv/SetMcPresetMotion` | Service | SetMcPresetMotion | Reliable | Outer→Robot |
+| 5 | 运控高层 | `/aima/mc/locomotion/velocity` | Topic | McLocomotionVelocity | Reliable/Volatile/D10，50–100Hz | Outer→Robot |
+| 6 | 运控高层 | `/aimdk_5Fmsgs/srv/SetMcInputSource` | Service | SetMcInputSource | Reliable | Outer→Robot |
+| 7 | 运控高层 | `/aimdk_5Fmsgs/srv/GetCurrentInputSource` | Service | GetCurrentInputSource | Reliable | Robot→Outer |
+| 8 | 运控高层 | `/aima/mc/custom/joint/command` | Topic | McCustomJointCommand | BestEffort/D10，100Hz | Outer→Robot |
+| 9 | 运控低层 | `/aima/hal/joint/command` | Topic | JointCommandArray | BestEffort/D10，500–1000Hz | Outer→Robot |
+| 10 | 运控低层 | `/aima/hal/joint/state` | Topic | JointStateArray | BestEffort/D10，500Hz | Robot→Outer |
+| 11 | 交互 | `/aimdk_5Fmsgs/srv/PlayTts` | Service | PlayTts | Reliable | Outer→Robot |
+| 12 | 交互 | `/aimdk_5Fmsgs/srv/GetVolume` / `SetVolume` | Service | Get/SetVolume | Reliable | 双向 |
+| 13 | 交互 | `/aimdk_5Fmsgs/srv/GetMute` / `SetMute` | Service | Get/SetMute | Reliable | 双向 |
+| 14 | 交互 | `/aimdk_5Fmsgs/srv/PlayAudioFile` | Service | PlayAudioFile | Reliable | Outer→Robot |
+| 15 | 交互 | TCP `6001`（PulseAudio simple-protocol） | TCP 流 | 48kHz mono S16LE | 流式 100ms 分块 | Outer→Robot |
+| 16 | 交互 | TCP `4713`（PulseAudio native-protocol） | TCP 流 | 48kHz **8ch** S16LE | 流式 | Robot→Outer |
+| 17 | 交互 | `/aima/hal/audio/audio_device_list` | Topic | AudioDeviceInfoList | BestEffort，1Hz | Robot→Outer |
+| 18 | 交互 | `/aima/agent/asr_result` | Topic | AsrResult | BestEffort/D10，事件驱动 | Robot→Outer |
+| 19 | 交互 | `/aimdk_5Fmsgs/srv/PlayEmotion` | Service | PlayEmotion | Reliable | Outer→Robot |
+| 20 | 系统 | `/aimdk_5Fmsgs/srv/ShutdownTask` | Service | ShutdownTask | Reliable | Outer→Robot |
+| 21 | HAL | `/aima/hal/touch/state` | Topic | TouchState | Reliable/D1，触发式 | Robot→Outer |
+| 22 | HAL | `/aima/hal/camera/CaptureJpegImage` | Service | CaptureJpegImage | Reliable，~1fps | Robot→Outer |
+| 23 | HAL | `rtsp://<IP>:2554/live_<camera_id>` | RTSP | 视频流 | 连续流 | Robot→Outer |
+| 24 | HAL | `/aimdk_5Fmsgs/srv/SetServo` | Service | SetServo | Reliable | Outer→Robot |
+| 25 | HAL | `/aima/hal/bms/state` | Topic | Bms | BestEffort，1Hz | Robot→Outer |
+| 26 | HAL | `/aimdk_5Fmsgs/srv/LedStripCommand` | Service | LedStripCommand | Reliable | Outer→Robot |
+| 27 | HAL | `/aimdk_5Fmsgs/srv/SetNeckLight` | Service | SetNeckLight | Reliable | Outer→Robot |
+| 28 | HAL | `/aima/hal/neck_light/state` | Topic | NeckLightState | Reliable/D1，触发式 | Robot→Outer |
+
+> 注：服务名统一带 `/aimdk_5Fmsgs/srv/` 前缀（`aimdk_msgs` 的 ROS 命名空间转义）；话题统一 `/aima/` 前缀，按 `hal / mc / agent` 三级分域。
+
+### 2.2 接口逐项定义（入参/出参）
+
+#### 2.2.1 运动控制模块
+
+**① GetMcAction 查询运动模式**〔官方〕
+- 功能：查询当前运动/形态动作（Action）生命周期阶段。
+- 入参：`request: CommonRequest`（含 `header: RequestHeader{stamp}`）。
+- 出参：`header: ResponseHeader{stamp, code}`；`info: McActionInfo{current_action: McAction{value}, source: string, action_desc: string, status: McActionStatus{value: IDLE=0/RUNNING=100/TRANSITION=200}, switch_ready: bool}`。
+- 要点：物理切换秒级耗时，须轮询至 `RUNNING` 再发后续指令；`value=0` 时以 `action_desc` 字符串兜底解析（内部保护动作可能不在公开枚举表）。
+
+**② SetMcAction 设置运动模式**〔官方〕
+- 功能：按状态机合法路径切换运动模式。
+- 入参：`header: RequestHeader`；`source: string`（触发源，语义见 McTaskSource：sdk_rpc/agent/task_engine/app/cloud/rc…，**为空返回 -10002**）；`command: McActionCommand{action: McAction{value}, action_desc: string}`（双通道：数值优先、字符串按配置名回退）。
+- 出参：`response: CommonTaskResponse{header{stamp,code}, task_id: uint64, state: CommonState{value, reason}}`。
+- 业务码：`1` 成功；`-1001~-1007` 状态机类错误（无切换规则/目标未定义/姿态不具备/行为不支持/超时）；`-10001` 请求过频（<500ms）；`-10002` 触发源为空。
+
+**③ SetMcMotion 设置全身动作（MIMIC）**〔官方〕
+- 功能：播放神经网络（.onnx）推理的全身动作。
+- 入参：`header`；`source`；`type: int32`（1=MIMIC_QY 自有模型 / 2=MIMIC_LC 灵创模型）；`motion: string`（内置动作名，如 QUAD_MIMIC_DANCE_TWO）；`model/resource: string`（外部路径，**当前版本服务端不解析**）；`interrupt: bool`；`operation: int32`（1=PRELOAD 预载 / 2=EXECUTION 执行）。
+- 出参：`response: CommonTaskResponse`（非阻塞入队 + task_id）。
+- 前置：先 SetMcAction 进入 `BIPED_STAND_DEFAULT`/`BIPED_LOCOMOTION_WBC` 等基础态并轮询确认 RUNNING。
+
+**④ SetMcPresetMotion 预设动作控制**〔官方〕
+- 功能：播放关键帧/预录关节轨迹（内置 69 个或外部 .csv）。
+- 入参：`header`；`source`；`area: McControlArea{value: NONE=0/LEFT_HAND=1/RIGHT_HAND=2/HEAD=4/WAIST=8}`（位掩码，仅作上层标识，服务端不过滤）；`motion: McPresetMotion{value}`（69 枚举）；`interrupt: bool`（false 时若他动画播放中会被拦截，此时 `header.code=1` 而 state 仍为 RUNNING——须判 header.code）；`ani_path: string`（非空优先加载机上 .csv，120fps）。
+- 出参：`response: CommonTaskResponse`。
+- 前置：必须处于 `BIPED_LOCOMOTION_WBC`；**服务端不做稳态检查**，极端姿态下指令也会立即下发（安全时序由调用方负责）。
+
+**⑤ /aima/mc/locomotion/velocity 走跑速度控制**〔官方〕
+- 功能：水平平移 + 转向 + 机身高度的连续控制主干汇聚口（遥控器/App 摇杆/自主导航共用）。
+- 入参（Payload）：`header: MessageHeader{stamp, frame_id, sequence, meas_stamp}`；`source: string`（**必须为已注册输入源**，严禁与内置 rc/pnc/interaction/vr/app_proxy/coreon_fusion 重名）；`forward_velocity / lateral_velocity: float64 (m/s)`；`angular_velocity: float64 (rad/s)`；`pitch_velocity: float64`（预留不生效）；`level: float64`（−1~1，WBC 下机身高度）。
+- 出参：无（话题）。
+- 仲裁：source 优先级抢占；单一信源 **1000ms** 断流自动脱锁顺延。
+
+**⑥ SetMcInputSource 输入源管理**〔官方〕
+- 功能：动态增删改/启停控制输入源并配置优先级。
+- 入参：`request: CommonRequest`；`action: McInputAction{value: ADD=1001/MODIFY=1002/DELETE=1003/ENABLE=2001/DISABLE=2002}`；`input_source: McInputSource{name: string, priority: int32(0–100), timeout: int32(ms, 默认1000)}`（ADD/MODIFY 必填全三字段，DELETE/ENABLE/DISABLE 仅 name）。
+- 出参：`response: CommonTaskResponse`。
+- 仲裁三准则：高优先级绝对抢占 / 同级先入为主独占 / 超时脱锁按序顺延。
+- ⚠️ 修改仅存 RAM，**重启丢失**（不回刷 YAML）。
+- 优先级参考带：100–80 系统级（E-Stop/安全保护）＞79–60 高级（RC/App 手动）＞59–40 中级（语音/手势）＞39–20 低级（**SDK 二开**/PNC）＞19–0 备用。内置源实测值：`rc=80, pnc=80, interaction=80, vr=70, app_proxy=60`。
+
+**⑦ GetCurrentInputSource 查询当前输入源**〔官方〕
+- 入参：`request: CommonRequest`。出参：`response: CommonTaskResponse`；`input_source: McInputSource`（当前持有"指挥锁"的唯一控制源；name 频繁切换=控制权抖动；空串=开机未受控）。
+
+**⑧ /aima/mc/custom/joint/command 自定义上肢关节**〔官方〕
+- 功能：双足形态上肢 6 关节连续目标流。
+- 入参（Payload）：`header: MessageHeader`；`joints: JointCommand[]{name, position, velocity, effort, stiffness, damping}`（仅上肢 6 关节，建议每帧全量填写，未填按 0 处理有关节突变风险）。
+- 出参：无。前置：`BIPED_CUSTOM_UPPER` 态 + RUNNING 确认。
+
+**⑨ /aima/hal/joint/command 低层关节控制**〔官方〕
+- 功能：全身 14 关节电机伺服直控（**需 Advanced 模式 + domains.mc.low_level_dev + 关闭高层运控**）。
+- 入参（Payload）：`header: MessageHeader`（stamp 必须机载时钟单调递增，乱序/重复即被总线驱动丢弃）；`joints: JointCommand[]{name(逻辑寻址唯一键，错拼静默丢弃), position(rad), velocity(rad/s), effort(N·m), stiffness(K_p), damping(K_d)}`。
+- 出参：无。
+- 安全约束：单帧位置增量 **≤0.2rad**；频率 500–1000Hz（<100Hz 触发硬件看门狗啸叫）；退出前必发全量 `stiffness:0, damping:5` 软关机帧。
+
+**⑩ /aima/hal/joint/state 关节状态反馈**〔官方〕
+- 出参（Payload）：`header`；`joints: JointState[]{name, position, velocity, effort, coil_temp(℃), motor_temp(℃), motor_vol(V)}`，500Hz 全量上报（二开模式下实际频率低于 1000Hz，勿以其为同步前提）。
+
+#### 2.2.2 交互控制模块
+
+**⑪ PlayTts 语音合成**〔官方〕
+- 入参：`header: CommonRequest`；`tts_req: PlayTtsRequest{text(≤100字), priority_level: TtsPriorityLevel{value: L1=1背景/L2=2服务/L4=4任务/L6=6交互默认/L7=7系统/L8=8预警/L10=10生命安全}, priority_weight: uint32(0–99), domain: string(业务域隔离与审计), trace_id: string(全局追踪), is_interrupted: bool(抢占/排队)}`。
+- 出参：`header: CommonResponse`；`tts_resp: PlayTtsResponse{text, priority_level, priority_weight, domain, trace_id, is_success, error_message, estimated_duration(流式合成固定返回0)}`。
+- 仲裁：最终权重 = 主级×100 + 子权；新任务权重≥当前且抢占模式→立即掐断；权重<当前→请求丢弃（is_success=false）。无播报完成事件（需按 ~200ms/字估时）。
+
+**⑫–⑬ Get/SetVolume、Get/SetMute**〔官方〕
+- SetVolume 入参：`request` + `audio_volume: uint32(0–100，越界自动截断)`；出参回读实际值。持久化，冷启动恢复。
+- SetMute 入参：`is_mute: bool`（true=物理功放关断，全局瞬时静默，不影响麦克风/ASR）；音量与静音两态独立。持久化。
+
+**⑭ PlayAudioFile 音频文件播放**〔官方〕
+- 入参：`request`；`file: AudioFile{pkg_name, file_name, file_path(绝对路径,建议≤1MB), info: AudioInfo{channels, sample_rate, size, sample_format, coding_format}(PCM必填/WAV自动解析), priority: uint32(1–10), priority_weight, media_role: string(Alert=100/Notification=80/Communication=60/Music=40,非Music自动duck压低音乐)}`。
+- 出参：`response: CommonResponse`。
+
+**⑮ TCP 6001 音频播放**〔官方〕：48kHz/mono/S16LE 流式；WAV 自动检测 RIFF 头、混音、重采样；100ms 分块 + 定时补偿。
+
+**⑯ TCP 4713 音频录制**〔官方〕：8ch/48kHz/S16LE 原始流（ch1–2 回采=扬声器回声参考，ch3–8 六麦阵列，**ch5–6 为主拾音通道**）；不内置 VAD/ASR。
+
+**⑰ /aima/hal/audio/audio_device_list**〔官方〕：`input_list/output_list: AudioDeviceInfo[]{id(动态分配勿作持久标识), device_addr(builtin_mic/builtin_speaker), device_type(builtin/bluetooth), device_name, is_sel}`，1Hz。
+
+**⑱ /aima/agent/asr_result 语音识别结果**〔官方〕
+- 出参（Payload）：`header`；`text: string`；`event_id: string`（对话上下文关联）；`is_final: bool`（false=中间结果）；`confidence: float32 [0,1]`；`language: string`。
+
+**⑲ PlayEmotion 表情与视频**〔官方〕
+- 入参：`header`；`type: string("emotion"/"file"，必填)`；`emotion_ids: int32[]`（23 内置表情）；`file_paths: string[]`（仅 mp4、绝对路径）；`priority: int32`（高打断低）；`loop_count: int32`（≤0 无限循环）。
+- 出参：`header: CommonResponse`。
+
+**⑳ ShutdownTask 主动关机**〔官方〕
+- 入参：`header`；`token: TokenCommon{source(必填,空则拒), token}`。出参：`header`。
+- ⚠️ 立即执行不判断当前状态（行走中直接断电），调用方须先引导至安全姿态。
+
+#### 2.2.3 硬件抽象模块
+
+**㉑ /aima/hal/touch/state**〔官方〕：`sensor_id(1=背部,2=胸部)`；`event_type(0–9：无/单击~六击/多击/左滑/右滑)`，触发式上报。
+
+**㉒ CaptureJpegImage 单帧抓拍**〔官方〕：入参 `request + camera_id: string("head_stereo_left/right") + timeout_ms: uint32(0=默认1000ms)`；出参 `jpeg: JpegImage{camera_id, device, width, height, framerate, exposure, gain, image: sensor_msgs/CompressedImage}`；全链路 100–500ms，建议 ≤1fps。
+
+**㉓ RTSP 视频流**〔官方〕：`rtsp://10.1.1.100:2554/live_head_stereo_{left,right}`；双足形态左目画面物理倒置，应用层须按形态（GetMcAction 查询）自行 180° 翻转。
+
+**㉔ SetServo 变形舵机**〔官方〕：入参 `request + position: uint8(0–90°，0=四足位/90=双足位) + speed: uint16(100–1000 步/s，1步=0.225°)`。
+
+**㉕ /aima/hal/bms/state**〔官方〕：版本信息 ×5 + `power_request` + `status: uint32`（29 位定义：充放电/过流/短路/过压/欠压/MOSFET 禁充禁放/温度/无线充电接入/关机触发…）+ 电压 mV/电流 mA(充电正)/功率 mW/温度/剩余容量 mAh/SOC%/循环次数/累计容量，1Hz。
+
+**㉖ LedStripCommand 灯带**〔官方〕：入参 `request + led_strip_mode: uint8(0–20 预定义 + 254 呼吸自定义 + 255 闪烁自定义, 非法值静默忽略) + r/g/b: uint8 + period: uint16(ms, 0=常亮)`。
+
+**㉗–㉘ SetNeckLight / neck_light/state 颈灯**〔官方〕：`enable: bool`（当前硬件仅支持开关，brightness 预留）。
+
+### 2.3 接口横切设计模式（官方口径提炼）
+
+1. **统一响应模型**：`ResponseHeader.code`（框架层 0/1）→ `CommonState.value`（业务层 11 态）→ `reason`（30 项故障原因枚举）→ `message`（诊断文本），四级判别。
+2. **全链路 source 溯源**：运控类接口必填 source（McTaskSource 9 枚举），TTS 带 domain/trace_id——为审计与仲裁提供统一身份。
+3. **异步任务化**：动作类接口返回 task_id 入队而非阻塞（PENDING→CREATED→RUNNING 状态机），长任务由调用方轮询。
+4. **双仲裁器**：运动控制走输入源优先级仲裁（0–100 + 1000ms 看门狗）；语音播报走 TTS 权重仲裁（主级×100+子权）。
+5. **安全护栏内嵌**：状态机合法路径 + 500ms 防抖 + 白名单/黑名单 + 单帧 0.2rad 限幅 + Ruckig 在线限幅 + 硬件看门狗 + 软关机帧约定。
+6. **QoS 分级**：控制流 Reliable、传感流 Best Effort+Volatile+Depth10、事件流 Reliable+Depth1。
+
+---
+
+## 三、端到端软件模块推导
+
+### 3.1 推导方法论
+
+SDK 不是随意编排的接口清单，其**命名空间、节点名、进程名、source 枚举**本身就是系统模块边界的"化石记录"。推导证据链：
+
+| 证据 | 来源 | 指向的模块 |
+|---|---|---|
+| 话题前缀 `/aima/hal/*`、`/aima/mc/*`、`/aima/agent/*` | 〔官方〕接口说明 | HAL / MC / Agent 三大服务域 |
+| 节点名 `/hal_camera`、`/hal_audio`、`/mc_ros2_node` | 〔官方〕快速入门 §2.1.4 | HAL 下分相机/音频子节点，MC 单节点 |
+| yamo 进程表：`sys_guard`、`mc`、`agent`、`task_engine`、`app_proxy`、`abox`、`node_control_worker`、`process_manager` | 〔官方〕快速入门 §4 | 板载常驻进程清单 |
+| McTaskSource 枚举 APP/CLOUD/RC/SDK_RPC/**AGENT**/**TASK_ENGINE**/MC_INTERNAL/**INSTA360** | 〔官方〕McTaskSource.msg | 任务来源侧的模块全景（含云端与外部相机） |
+| 内置输入源 `rc/pnc/interaction/vr/app_proxy/coreon_fusion` | 〔官方〕接口说明 §2.1.1.4 | 速度控制流的外部来源模块 |
+| `ShutdownTask` srv 注释"task engine 层" | 〔官方〕 | Task Engine 为独立服务层 |
+| "运控板负责 HAL、MC 及各类基础交互服务（表情、语音等）；大脑板负责核心 AI 算法、感知、规划及供应商程序" | 〔官方〕快速入门 §1 | 模块→物理板卡的部署映射 |
+| ASR 结果挂在 `/aima/agent/` 域 | 〔官方〕 | ASR 归属 Agent 域（大脑板侧或其托管服务） |
+| RTSP 端口在 10.1.1.100（运控板） | 〔官方〕接口说明 | 相机驱动与流媒体服务在运控板 |
+| TCP 音频走运控板 PulseAudio | 〔官方〕 | 音频子系统在运控板 |
+
+### 3.2 软件模块清单与部署映射
+
+```mermaid
+flowchart TB
+    subgraph CLOUD["云端与外部生态（M0）"]
+        APP["手机 App（PrimeBot App）"]
+        WB["WorkBuddy 云脑·数万 Skill〔官方产品口径〕"]
+        STORE["PrimeStore/PrimeHub 技能市场·RPK"]
+        INSTA["Insta360 相机〔官方 source 枚举〕"]
+        RCO["实体遥控器 RC"]
+    end
+
+    subgraph BRAIN["大脑板 10.1.1.101（M1–M4）〔官方：核心算法/感知/规划/供应商程序〕"]
+        AGENT["M1 Agent 对话智能体<br/>（进程 agent〔官方〕：ASR 出口/意图理解/对话记忆）"]
+        TE["M2 Task Engine 任务引擎<br/>（进程 task_engine〔官方〕：自动任务/定时任务编排）"]
+        PNC["M3 感知规划服务 pnc<br/>（输入源 pnc〔官方〕：跟随/避障/VSLAM/导航速度输出）"]
+        APROXY["M4 app_proxy 代理<br/>（输入源 app_proxy〔官方〕：App/云指令转发）"]
+    end
+
+    subgraph MCUB["运控板 10.1.1.100（M5–M8）〔官方：HAL/MC/交互基础服务〕"]
+        INTER["M5 交互基础服务<br/>（TTS 调度/表情/音频/音量——官方'表情、语音等基础服务'）"]
+        MC["M6 MC 运动控制服务 /mc_ros2_node〔官方〕<br/>动作状态机·输入源仲裁·任务队列"]
+        HALN["M7 HAL 硬件抽象<br/>/hal_camera /hal_audio〔官方节点〕+ joint/bms/touch/led/servo"]
+        PM["M8 PrimeMotion 实时运控内核〔产品口径〕<br/>多专家混合 RL + WBC + 关节伺服闭环"]
+    end
+
+    subgraph FW["固件层（M9–M10）"]
+        JOINT["M9 关节执行器固件 ×14<br/>电流环/限位/温控/看门狗"]
+        YAMO["M10 yamo 进程管理 + sys_guard〔官方〕<br/>两阶段自启动·cgroup·黑匣子日志"]
+    end
+
+    APP & WB & STORE <-->|"App 通道/WebRTC·HTTPS〔推测〕"| APROXY
+    INSTA -->|"source=INSTA360〔官方枚举〕"| TE
+    RCO -->|"source=rc·优先级80〔官方〕"| MC
+    AGENT -->|"source=agent〔官方枚举〕"| MC
+    TE -->|"source=task_engine〔官方枚举〕"| MC
+    PNC -->|"velocity source=pnc〔官方〕"| MC
+    APROXY -->|"source=app_proxy·优先级60〔官方〕"| MC
+    AGENT & TE & PNC --> INTER
+    MC --> HALN --> PM --> JOINT
+    INTER --> HALN
+    YAMO -.-> AGENT & TE & MC & INTER
+```
+
+### 3.3 各模块接口清单（提供 × 调用）
+
+> 说明：〔官方〕接口的完整入参/出参见第二章；本节对**推导出的内部接口**给出完整定义。内部接口名以 `IA-xx`（Internal Agent）、`IM-xx`（Internal MC）等编号，名称为本文拟名。
+
+#### M0 云端与外部生态
+
+| 提供（对外系统的接口） | 调用 |
+|---|---|
+| App 控制通道（遥控摇杆→app_proxy；开发者模式切换配置〔官方快速入门〕）；WorkBuddy Skill 调用（A2A，协议未公开〔推测：HTTPS/WS〕）；技能市场 RPK 分发下载；Insta360 联动触发（source=INSTA360〔官方〕）；RC 遥控指令流（source=rc，优先级 80〔官方〕） | — （外部系统） |
+
+#### M1 Agent 对话智能体（大脑板，进程 agent〔官方〕）
+
+**提供：**
+
+| 接口 | 功能 | 入参 | 出参 | 证据 |
+|---|---|---|---|---|
+| `/aima/agent/asr_result`（Topic） | 发布 ASR 识别结果（中间+最终） | — | AsrResult{text, event_id, is_final, confidence, language} | 〔官方〕 |
+| IA-1 意图理解（内部服务） | 文本→任务意图+槽位（如"跳舞"→ dance 技能 + 形态条件） | text, event_id, 上下文记忆 | 意图对象{skill, params, confidence} | 〔推导：asr_result 挂 agent 域 + McTaskSource.AGENT 枚举存在〕 |
+| IA-2 对话应答生成（内部） | 生成口语应答文本（端云 LLM，WorkBuddy 接入〔官方产品报道〕） | 意图对象+对话历史 | 应答文本+动作计划 | 〔推导〕 |
+
+**调用：**
+
+| 被调接口 | 用途 |
+|---|---|
+| M5-PlayTts（source 侧 domain="agent"，L6 级） | 播报应答 |
+| M5-PlayEmotion（270 说话态/18-19 喜悦等） | 表情联动 |
+| M6-SetMcAction / SetMcMotion / SetMcPresetMotion（source="agent"） | 下发动作任务 |
+| M6-GetMcAction | 查形态/状态决定动作选型（如跳舞动作按形态分流） |
+| 云端 LLM/WorkBuddy API〔推测〕 | 复杂意图与 Skill 扩展 |
+
+#### M2 Task Engine 任务引擎（大脑板，进程 task_engine〔官方〕）
+
+**提供：**
+
+| 接口 | 功能 | 入参 | 出参 | 证据 |
+|---|---|---|---|---|
+| `/aimdk_5Fmsgs/srv/ShutdownTask` | 主动关机（task engine 层实现） | TokenCommon{source≠空} | CommonResponse | 〔官方〕 |
+| IT-1 任务编排（内部） | 定时/自动/复合任务（闹钟、清扫、拍摄脚本）拆解为动作序列 | 任务描述 | 动作序列+时序约束 | 〔推导：McTaskSource.TASK_ENGINE=6 存在 + TTS 优先级表"定时任务通知 SERVICE_L2""运控任务关键节点 MISSION_L4"暗示任务引擎为 TTS 的调用域〕 |
+
+**调用：** M6 全部运控服务（source="task_engine"）；M5-PlayTts（L2/L4 级）；M1 的任务结果回传〔推导〕。
+
+#### M3 感知规划服务 pnc（大脑板）
+
+**提供：**
+
+| 接口 | 功能 | 入参 | 出参 | 证据 |
+|---|---|---|---|---|
+| IP-1 速度指令输出 | 以 source="pnc"（优先级 80〔官方〕）发布 /aima/mc/locomotion/velocity | 感知目标（人/路径/充电桩） | McLocomotionVelocity 50–100Hz | 〔官方〕 |
+| IP-2 跟随/避障/回充任务接口（内部） | App 下发的自主任务入口 | 任务目标 | 任务状态 | 〔推导：Pro 独占功能表 + pnc 输入源存在〕 |
+
+**调用：** RTSP 视频流（hal 相机，运控板 2554）；CaptureJpegImage；M6-SetMcAction（进入行走模式）；M6-SetMcInputSource（注册 pnc 源）；M5-PlayTts（任务播报）。〔推导〕
+
+#### M4 app_proxy 代理服务（大脑板）
+
+**提供：** App/云 → 机器人全量 SDK 服务的代理转发（source="app_proxy"，优先级 60〔官方〕）；开发者模式配置下发（标准/开发、Basic/Advanced、领域开关〔官方快速入门〕）。
+**调用：** M6/M5 全量服务；M10 配置接口。〔推导〕
+
+#### M5 交互基础服务（运控板，"表情、语音等基础服务"〔官方〕）
+
+**提供（全部〔官方〕，详见 §2.2）：** PlayTts、PlayEmotion、Get/SetVolume、Get/SetMute、PlayAudioFile、audio_device_list；TCP 6001/4713（PulseAudio 通道）；（ASR 结果由 Agent 域发布，音频采集硬件与通道由本模块的 hal_audio 提供）。
+
+**内部推导接口：**
+
+| 接口 | 功能 | 入参 | 出参 | 证据 |
+|---|---|---|---|---|
+| IS-1 TTS 合成引擎调用 | 文本→音频流（云端/本地流式合成——官方"无网络时无法播放未缓存新文本"→云端合成〔官方推导〕） | text, voice 配置 | 音频流 48kHz | 〔官方+推导〕 |
+| IS-2 播报队列仲裁器 | 权重=主级×100+子权 排序/抢占/duck | PlayTtsRequest | 播放顺序决策 | 〔官方仲裁矩阵反推〕 |
+| IS-3 音频前端（AEC/VAD/唤醒，归属 Agent 域或本模块〔推测〕） | 8ch 采集→回声消除（ch1-2 回采参考）→波束/降噪→VAD→唤醒词"元仔"〔官方昵称，唤醒引擎未文档化〕 | 8ch PCM 流 | 唤醒事件+净化语音流 | 〔推导：8ch 含 2 回采通道的官方硬件事实〕 |
+
+**调用：** M7-hal_audio（PulseAudio 录放）；屏幕/灯效 HAL 驱动；云端 TTS/ASR 服务〔推导〕。
+
+#### M6 MC 运动控制服务（运控板，节点 /mc_ros2_node〔官方〕）
+
+**提供（全部〔官方〕，详见 §2.2）：** GetMcAction、SetMcAction、SetMcMotion、SetMcPresetMotion、SetMcInputSource、GetCurrentInputSource、/aima/mc/locomotion/velocity、/aima/mc/custom/joint/command。
+
+**内部推导接口（服务端内部机制，官方行为证据反推）：**
+
+| 接口 | 功能 | 入参 | 出参 | 证据 |
+|---|---|---|---|---|
+| IM-1 动作状态机 | 校验切换合法性/白名单/防抖，非法拦截 | 当前态+目标 action | 合法路径或拒绝码(-1001~-1006/-10001) | 〔官方错误码+状态机图〕 |
+| IM-2 任务队列管理器 | 动作任务化生命周期 PENDING→CREATED→RUNNING | 指令 | task_id+状态流转 | 〔官方 CommonState 异步语义〕 |
+| IM-3 输入源仲裁器 | 五档优先级锁+1000ms 看门狗脱锁+同级先入为主 | velocity 流(source) | 当前生效源+拦截决策 | 〔官方三准则〕 |
+| IM-4 关节目标流下发（MC→PrimeMotion） | 将 Action/Motion/速度解算为目标关节流交实时内核 | 模式+参数+状态 | 执行状态回调 | 〔推导：SDK 不开放 MC-内核边界，行为由 GetMcAction 语义证实〕 |
+
+**调用：** M7-/aima/hal/joint/command 形态（低层开发者模式下让位）；M8 PrimeMotion 内核；/aima/hal/bms/state（低电量拦截 REASON_LOW_BATTERY〔官方 reason 枚举〕）；M3 的障碍信号（REASON_OBSTACLE_*〔官方〕）。
+
+#### M7 HAL 硬件抽象（运控板）
+
+**提供（全部〔官方〕）：** /aima/hal/joint/command、joint/state、bms/state、touch/state、neck_light/state、audio_device_list；CaptureJpegImage；RTSP 流（2554）；SetServo；LedStripCommand；SetNeckLight；TCP 音频底层。
+
+**调用：** M8 关节总线（高级开发模式下 hal/joint/command 直通内核）；各硬件驱动（相机 V4L2、音频 ALSA/PulseAudio、BMS 串口、LED、触摸、舵机——实现〔推测〕）。
+
+#### M8 PrimeMotion 实时运控内核（运控板，产品口径"多专家混合 RL"）
+
+**提供（对 M6/M7 内部）：** 关节阻抗伺服闭环通道（stiffness/damping 语义〔官方〕）；平衡/步态/全身控制执行；安全兜底（姿态超限、超时阻尼、跌倒保护、低电量自动变形〔产品口径〕）。
+**调用：** M9 关节固件总线（CAN-FD/EtherCAT〔推测，未公开〕）。
+**SDK 证据**：低层接口的 impedance 参数、0.2rad 步进限制、<100Hz 硬件看门狗、软关机帧——全部是"内核在闭环、SDK 只是喂目标"的间接官方证据。
+
+#### M9 关节执行器固件 ×14
+
+**提供：** 电流环（kHz 级）、限位/限速/温控、本地看门狗；越限强制关断（官方"超出软件限位触发底层固件拦截"）。
+**调用：** 无（最底层）。
+
+#### M10 yamo 进程管理 + sys_guard（双板）
+
+**提供（〔官方〕快速入门 §4）：** 进程生命周期（yamo em doctor/start-app/stop-app）；两阶段自启动（stage1: sys_guard/mc… 1500ms → stage2: app_proxy…abox 8000ms）；cgroup 资源分组；日志规范（/robot/persist/log）。
+**调用：** cgroup、systemd 类机制〔推测〕。
+
+### 3.4 模块调用关系矩阵（行=调用方，列=被调方提供的能力）
+
+| 调用方 ↓ \ 提供方 → | M1 Agent | M2 TaskEngine | M3 pnc | M5 交互 | M6 MC | M7 HAL | 云端 M0 |
+|---|---|---|---|---|---|---|---|
+| M0 App/云/RC/Insta | — | 触发任务 | 下发自主任务 | （经代理）音量/播报 | （app_proxy/rc 直连）速度/动作 | — | — |
+| M1 Agent | — | 委派复合任务〔推导〕 | 感知查询〔推导〕 | **PlayTts/PlayEmotion** | **SetMcAction/Motion/PresetMotion(source=agent)** | GetMcAction 间接 | LLM/WorkBuddy〔推测〕 |
+| M2 TaskEngine | 结果回传 | — | — | PlayTts(L2/L4) | **全量运控(source=task_engine)** | — | — |
+| M3 pnc | — | — | — | PlayTts | **velocity(source=pnc)+SetMcAction+SetMcInputSource** | **RTSP/CaptureJpegImage** | 地图/云〔推测〕 |
+| M5 交互 | ASR 结果→发布 | — | — | — | — | **hal_audio/屏幕/灯效驱动** | 云端 TTS/ASR〔推导〕 |
+| M6 MC | — | — | 障碍信号〔推导〕 | 状态广播 | — | **joint 通道+bms 订阅** | — |
+| M7 HAL | — | — | — | — | — | — | — |
+| 开发者程序（SDK 用户） | 订阅 asr_result | ShutdownTask | — | 全部交互服务 | **全部 8 个运控接口(source=sdk_rpc，优先级带 39–20)** | 全部 HAL 话题/服务 | — |
+
+---
+
+## 四、演示 Case："元仔元仔，给我跳个舞"端到端剖析
+
+### 4.1 场景设定
+
+- 机器人处于**四足站立待机**（QUADRUPED_STAND_DEFAULT，用户刚回家未唤醒），电量充足，室内无障碍；
+- 用户说出唤醒词+指令："**元仔元仔，给我跳个舞**"（"元仔"为 T1 官方昵称/唤醒名〔官方 B 站口径〕）；
+- 期望行为：应答一句 → 播放喜悦表情 → 灯带律动 → 四足舞蹈 → 舞毕自动回到站立；
+- 对照分支：若当前是**双足形态**，舞蹈走 SetMcPresetMotion 链路（4.3-G'）。
+
+### 4.2 端到端时序图
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant MIC as 麦克阵列+音频前端<br/>(M5/M7·运控板)
+    participant ASR as ASR 引擎<br/>(M1·agent 域)
+    participant AG as Agent 智能体<br/>(M1·大脑板)
+    participant LLM as 端云 LLM/WorkBuddy<br/>(M0·云端〔推测〕)
+    participant IN as 交互服务<br/>(M5·运控板)
+    participant MC as MC 服务<br/>(M6·运控板)
+    participant PM as PrimeMotion<br/>(M8·运控板)
+    participant J as 关节×14<br/>(M9)
+
+    U->>MIC: 声音"元仔元仔，给我跳个舞"
+    MIC->>MIC: AEC(ch1-2回采参考)/波束/VAD/唤醒词检测〔推导〕
+    MIC->>ASR: 净化语音流(48kHz)
+    ASR-->>AG: /aima/agent/asr_result (is_final=false 中间结果)
+    ASR-->>AG: /aima/agent/asr_result (is_final=true, text="元仔元仔，给我跳个舞", event_id=E1)
+    AG->>LLM: 意图理解(dance)〔端云分工推测〕
+    LLM-->>AG: 意图{skill:dance, form:quadruped}
+    AG->>IN: PlayTts("好呀，看我的！") L6+weight, is_interrupted=true
+    IN->>IN: TTS 仲裁(权重 6×100+w 抢占背景音)
+    IN-->>U: 扬声器播放(应答)
+    par 表情/灯效并行
+        AG->>IN: PlayEmotion(emotion_ids=[19 非常喜悦])
+        AG->>IN: LedStripCommand(LED_DANCING=3)
+    and 动作主链
+        AG->>MC: SetMcAction(source="agent", action=QUADRUPED_LOCOMOTION_DANCE/109)
+        MC->>MC: IM-1 状态机校验(站立→技能类合法) + IM-2 入队
+        MC-->>AG: CommonTaskResponse{task_id=T1, state=PENDING}
+        MC->>PM: IM-4 舞蹈动作目标流
+        PM->>PM: 多专家 RL(舞蹈策略)+WBC+安全监督
+        PM->>J: 关节阻抗指令(高频闭环)
+        J-->>PM: 关节状态
+    end
+    loop 状态闭环（Agent/上层轮询）
+        AG->>MC: GetMcAction
+        MC-->>AG: status: TRANSITION(200)→RUNNING(100)
+    end
+    J-->>MC: /aima/hal/joint/state (500Hz 全量)
+    Note over MC,PM: 舞毕：技能类过渡态自动回 QUADRUPED_STAND/LOCOMOTION〔官方〕
+    MC-->>AG: GetMcAction → 回到基础态
+    AG->>IN: PlayEmotion(10 平静-1)+LedStripCommand(LED_ALL_OFF/白色呼吸)
+```
+
+### 4.3 分阶段分解（数据实例）
+
+**A. 拾音与唤醒**（M7-hal_audio → M5 音频前端）
+- 硬件：8ch 48kHz S16LE，ch1–2 回采（扬声器参考，AEC 用）、ch3–8 六麦，ch5–6 主拾音〔官方〕；
+- 唤醒词"元仔"检测引擎未在 SDK 文档化〔推测：端侧唤醒，消费级产品标配〕；
+- 数据流 D1：`8ch PCM (1.536 MB/s)` 板内 PulseAudio 通道。
+
+**B. 语音识别**（ASR → /aima/agent/asr_result〔官方〕）
+- 流式输出中间结果（is_final=false）+ 最终结果；
+- 数据流 D2：`AsrResult{text:"元仔元仔，给我跳个舞", event_id:"E1", is_final:true, confidence:0.9x, language:"zh"}`。
+
+**C. 意图理解与编排**（M1 Agent，McTaskSource.AGENT=5〔官方枚举〕）
+- 唤醒段（"元仔元仔"）确立交互会话 → 指令段解析为 `{skill: dance}`；
+- 形态感知：Agent 经 GetMcAction 得知 `current_action=QUADRUPED_STAND_DEFAULT` → 选四足舞蹈路径；
+- 数据流 D3（内部）：意图对象 + 对话上下文（长期记忆〔产品口径〕）。
+
+**D. 应答生成（并行支线 1）**（M5 PlayTts〔官方〕）
+- 控制流 C6：TTS 仲裁——应答用 `INTERACTION_L6(6)` + weight，`is_interrupted=true` 抢占可能存在的背景播报（权重 6×100+w > 2×100）；
+- 数据流 D8a：`PlayTtsRequest{text:"好呀，看我的！", priority_level:{value:6}, domain:"agent", trace_id:"tr-xxx"}` → 流式合成（~200ms/字〔官方建议值〕）→ 48kHz 音频流 → 功放。
+
+**E. 表情与灯效（并行支线 2）**〔官方〕
+- D8b：`PlayEmotion{type:"emotion", emotion_ids:[19], loop_count:1, priority:1}`；
+- D8c：`LedStripCommand{led_strip_mode:3(LED_DANCING 律动)}`；
+- 舞毕收尾：`PlayEmotion{emotion_ids:[10 平静]}` + 灯效复位。
+
+**F. 动作决策与下发（主链）**
+- 四足路径：`SetMcAction{header, source:"agent", command:{action:{value:109}}}`（QUADRUPED_LOCOMOTION_DANCE）；
+- 备选：`SetMcMotion{source:"agent", type:1(MIMIC_QY), motion:"QUAD_MIMIC_DANCE_TWO", operation:2}`——MIMIC 类由系统自动从基础态切入/切回〔官方〕；
+- 控制流 C2：source="agent" 的指令在输入源仲裁中的档位——若舞蹈同时有速度流则受仲裁约束；离散 Action 主要受状态机约束（C3）。
+
+**G. 状态机校验与任务化**（M6 IM-1/IM-2）
+- C3：`站立(101) → 技能类(109)` 属状态机合法路径（QBASE→QSKILL〔官方图〕）；白名单校验（REASON_NO_WHITELIST=7 拦截未授权动作）；500ms 防抖（-10001）；
+- D5：`CommonTaskResponse{code:0, task_id:T1, state:{value:200 PENDING}}`；
+- 失败分支举例：电量低 → `reason=5 REASON_LOW_BATTERY`；正在充电 → `reason=6`。
+
+**G'. 双足形态对照路径**〔官方〕
+- 前置：`SetMcAction(BIPED_LOCOMOTION_WBC=300)` 并轮询 GetMcAction 至 RUNNING；
+- 下发：`SetMcPresetMotion{source:"agent", area:{value:11(左手|右手)}, motion:{value:2021 DANCE_MOVE 或 3061 FULL_BODY_DANCE_2}, interrupt:true}`；
+- 服务端无稳态检查、area 不过滤——安全时序由 Agent 保证〔官方警示〕。
+
+**H. 实时执行**（M6→M8→M9，板内闭环）
+- IM-4：舞蹈目标流（离线编排/RL 策略输出〔产品口径多专家 RL〕）；
+- M8：500Hz+ 阻抗闭环、Ruckig 限幅、姿态安全监督；
+- D6（板内）：关节目标/力矩流；C5：安全监督（跌倒→QUADRUPED_RECOVERY 路径存在〔官方〕）。
+
+**I. 状态回流与收尾**
+- D7：`/aima/hal/joint/state` 500Hz 全量（上层监控/记忆，不进控制环）；
+- C7：技能过渡态结束自动回 `QUADRUPED_STAND_DEFAULT`（或 LOCOMOTION_DEFAULT）〔官方虚线路径〕；
+- Agent 轮询 GetMcAction 确认回位 → 对话记忆写入（"刚刚给主人跳了舞"〔产品口径长期记忆〕）。
+
+### 4.4 数据流与控制流清单
+
+| 编号 | 流 | 内容 | 生产者→消费者 | 经由接口 |
+|---|---|---|---|---|
+| D1 | 原始音频 | 8ch 48kHz PCM | 麦克阵列→音频前端 | 板内 PulseAudio〔官方通道〕 |
+| D2 | ASR 文本 | AsrResult | ASR→Agent/上层 | /aima/agent/asr_result |
+| D3 | 意图/任务 | 意图对象 | Agent→TaskEngine/MC | IA-1/IA-2〔推导〕 |
+| D4 | 动作指令 | SetMcAction/Motion/Preset 请求 | Agent→MC | §2.2 各服务 |
+| D5 | 任务回执 | task_id+state | MC→Agent | CommonTaskResponse |
+| D6 | 关节目标流 | 位置/速度/力矩/阻抗 | MC→PrimeMotion→关节 | IM-4〔推导〕+板内总线 |
+| D7 | 状态回流 | JointStateArray 500Hz | 关节→HAL→上层 | /aima/hal/joint/state + GetMcAction |
+| D8 | 表达输出 | TTS 音频/表情/灯效 | 交互服务→功放/屏/灯 | PlayTts/PlayEmotion/LedStripCommand |
+
+| 编号 | 控制流 | 机制 | 证据 |
+|---|---|---|---|
+| C1 | 唤醒门控 | 唤醒词开 ASR 会话（event_id 关联） | 〔推导+官方 event_id〕 |
+| C2 | 输入源仲裁 | 五档优先级+1000ms 看门狗+先入为主 | 〔官方〕 |
+| C3 | 状态机校验 | 合法拓扑+白/黑名单+500ms 防抖+形态匹配 | 〔官方错误码〕 |
+| C4 | 任务生命周期 | task_id 异步：PENDING→CREATED→RUNNING | 〔官方 CommonState〕 |
+| C5 | 安全监督 | 30 项 reason 拦截+急停直达+超时阻尼+限幅 | 〔官方〕 |
+| C6 | TTS 优先级仲裁 | 权重=级×100+子权，抢占/排队矩阵 | 〔官方〕 |
+| C7 | 自动回位 | 技能/变形/恢复态自动回基础态 | 〔官方状态机〕 |
+
+### 4.5 时延预算（数量级估算）
+
+| 阶段 | 估计 | 依据 |
+|---|---|---|
+| 唤醒确认 | <500ms | 〔推测〕消费级标配 |
+| ASR 最终结果 | 300–800ms | 流式中间结果机制〔官方〕+〔推测〕 |
+| 意图理解 | 200ms–1s | 端云 LLM 分工〔推测〕；简单指令可端侧命中 |
+| TTS 首包 | ~200–500ms | 官方"流式合成、200ms/字"反推 |
+| 动作指令受理 | <100ms（入队即回） | 官方非阻塞语义 |
+| 姿态过渡（TRANSITION） | 数秒 | 官方明示"机械过渡可能长达数秒" |
+| 舞蹈执行 | 10–30s | 动作库时长量级（滑冰 30s〔官方〕） |
+| **端到端（说完→开始舞动）** | **≈1–3s** | 综合估算〔推测〕 |
+
+### 4.6 异常分支（安全设计如何介入）
+
+| 异常 | 系统行为 | 证据 |
+|---|---|---|
+| 电量 < 阈值 | SetMcAction 被拒 `reason=5 REASON_LOW_BATTERY`；产品级低电自动切四足防摔 | 〔官方 reason 枚举+产品口径〕 |
+| 正在充电 | 拒绝 `reason=6 REASON_CHARGE` | 〔官方〕 |
+| 双足指令发到四足形态 | 拒绝 `reason=19 REASON_FORM_MIS_MATCH` / `-1004 姿态不具备` | 〔官方〕 |
+| 舞蹈中再次喊"停" | ASR→Agent 打断：新 SetMcAction 抢占（技能态可切出）或急停 `PASSIVE_DEFAULT`（任何态直达） | 〔官方状态机〕 |
+| 语音链路掉线 | 舞蹈为已入队任务继续执行完并自动回位（任务不依赖持续指令流；速度流才有 1000ms 脱锁） | 〔官方语义〕 |
+| 舞蹈中被抱起/倾倒 | 力控柔顺+倾倒保护（被拎起即停）；倒地后 `QUADRUPED_RECOVERY` 可恢复 | 〔产品口径+官方 Action〕 |
+| 上层进程崩溃 | PrimeMotion 板内闭环继续保平衡；任务流断则安全停止 | 〔官方"内核闭环"证据链〕 |
+
+### 4.7 本 Case 之外值得梳理的关键信息（回应"还有什么要梳理"）
+
+1. **安全链全景**：SDK 只暴露了 reason 枚举与急停态；E-Stop 硬件通道、bms power_request（长按关机位）、看门狗分层（1000ms 软/100Hz 硬）如何串联成纵贯链，值得实机验证。
+2. **形态感知的权威来源**：SetServo 的 0–90° 是变形舵机角度，GetMcAction 是逻辑形态；双目左目画面随形态倒置说明相机外参与形态强相关——形态应是一等系统状态（影响感知标定/动作合法性/状态估计）〔官方证据综合〕。
+3. **QoS 与带宽治理**：运控板资源"极度有限"〔官方原话〕；高频大包（joint/state 500Hz、RTSP）与控制流共享 20M UDP 缓冲的隔离策略（SHM 默认关闭）值得压测。
+4. **时间同步**：header.stamp 单调性由总线驱动强制〔官方〕，但跨板（大脑/运控）时钟源与 meas_stamp 语义未文档化——多传感融合与日志对账的前提。
+5. **已知接口缺口清单**〔官方技能 README 自述+本文核验〕：无 SLAM/导航接口、无夹爪、无 ASR 开放输入接口（只读结果不能注入）、无力传感接口、无双目深度/ToF 数据接口（仅 RGB JPEG/RTSP）、TTS 无播报完成事件、SetMcInputSource 不持久化、SetMcMotion 外部 model/resource 字段未实现——这些缺口恰是 T1 Pro 后续版本与竞品对比的观察点。
+6. **多机与隔离**：ROS_DOMAIN_ID 区分多台机器人〔官方〕，但 DDS 无认证（同网段即入网）——开发者模式下局域网安全模型值得评估（对照宇树 CVE 教训）。
+
+---
+
+## 五、整体系统架构推导
+
+### 5.1 架构总图
+
+```mermaid
+flowchart TB
+    subgraph L5["L5 云端生态层：WorkBuddy 云脑·PrimeStore/RPK·OTA·Insta360 联动"]
+    end
+    subgraph BRAIN["大脑板（10.1.1.101：Orin Nano〔Pro〕/ RK〔基础〕，Ubuntu+ROS2 Humble）"]
+        L4["L4 智能应用层：Agent 对话智能体（ASR 出口/意图/记忆）·Task Engine·app_proxy"]
+        L3p["L3 感知规划层：pnc（跟随/避障/VSLAM/回充——Pro 档功能开关）"]
+    end
+    subgraph MCU["运控板（10.1.1.100，资源极度有限〔官方〕）"]
+        L2i["L2 交互基础服务：TTS 调度（8 级仲裁）·表情·音频·音量"]
+        L2m["L2 机动服务层 MC /mc_ros2_node：41 态动作状态机·任务队列(task_id)·输入源仲裁(0–100+1000ms 看门狗)"]
+        L1["L1 实时运控内核 PrimeMotion：多专家混合 RL+WBC+关节阻抗伺服（500Hz+，板内闭环不开放）"]
+        HAL["L1.5 HAL：camera/audio/joint/bms/touch/led/servo（/aima/hal/*）"]
+    end
+    subgraph J["关节固件 ×14：电流环·限位·温控·看门狗（越限强制关断）"]
+    end
+
+    L5 <-->|"App/云通道·A2A〔推测〕"| L4
+    L4 --> L2i
+    L4 -->|"source=agent/task_engine"| L2m
+    L3p -->|"velocity source=pnc 50–100Hz"| L2m
+    L3p <-->|"RTSP/JPEG"| HAL
+    L2i --> HAL
+    L2m -->|"IM-4 目标流〔推导〕"| L1
+    HAL <-->|"低层直控（Advanced 域）"| L1
+    L1 --> J
+    HAL <--> J
+```
+
+**一句话概括**：大脑板管"想"（Agent/感知/规划），运控板管"动"（MC 状态机+交互基础服务+实时内核），一块 FastDDS 局域网总线把两侧和开发者 PC 平等缝在一起；安全与实时闭环下沉在运控板与关节固件，开放面全部收敛为 ROS2 Topic/Service。
+
+### 5.2 架构特征分析（SDK 证据支撑）
+
+1. **双板双域，职责官方明文**：运控板=HAL+MC+基础交互（重实时轻算力），大脑板=核心算法+感知+规划+供应商程序（重算力）——"小脑/大脑"物理分离。
+2. **频率金字塔可从接口频率反推**：关节 500–1000Hz（低层）→ 速度 50–100Hz → 上肢 100Hz → Action/Motion 事件级 → ASR/对话事件级——每层向上抽象一级（力矩→速度→技能→意图）。
+3. **状态机中心化**：41 态动作状态机是全系统运动行为的单一事实源（语音、App、导航、SDK 全部经它校验），形态（四足/双足/变形）是状态机的一等公民。
+4. **双仲裁器并行**：运动输入源仲裁（物理控制权）+ TTS 权重仲裁（发声通道）——两类稀缺物理资源各配独立仲裁。
+5. **分级开放治理**：五层权限 + Advanced 独占低层域——"卖安全"与"卖能力"的商业分层编码在系统里。
+6. **安全纵贯**：30 项 reason 前置拦截（服务层）→ 状态机拓扑约束（MC 层）→ Ruckig/步进限幅（指令层）→ 硬件看门狗/限位关断（固件层）→ 双急停任何态直达。
+7. **资产化动作生态**：Action（内置状态）→ Motion（onnx 神经网络资产）→ PresetMotion（120fps csv，可示教录制）三级动作资产，配合技能市场形成 UGC 分发。
+8. **端云分工可插拔**：TTS 云端合成（离线仅缓存可播〔官方〕）、LLM/WorkBuddy 云脑、RPK 技能包——云端是能力放大器而非必需品。
+
+---
+
+## 六、关键技术抓手
+
+| # | 抓手 | 内涵 | 证据强度 |
+|---|---|---|---|
+| 1 | **双形态统一动作状态机** | 单一状态机编排四足 21 态+双足 12 态+变形 4 态，技能态自动回位、变形/恢复为过渡态；形态合法性（FORM_MIS_MATCH）深入每条指令 | 〔官方〕 |
+| 2 | **RL 动作资产管线** | MIMIC onnx 推理动作（20 个）+ 120fps csv 关键帧（69 内置+示教自录）+ 灵创/Blender 工具链 + App 手把手教学——"动作即数据、可 UGC、可上架" | 〔官方〕 |
+| 3 | **双仲裁体系** | 输入源五档优先级+看门狗（物理运动权）；TTS 十档权重+抢占矩阵（发声权）——多控制源并存的产品级答案 | 〔官方〕 |
+| 4 | **多专家混合 RL 运控内核** | 基础运动/柔顺/安全专家混合（遇外力顺势、被拎起即停）；SDK 只开放目标流不开放伺服——力控安全是体验底座 | 〔产品口径+官方阻抗接口佐证〕 |
+| 5 | **纯视觉+ToF 感知与形态自适应** | 无激光雷达路线；相机外参随形态变化（左目倒置证据）；Pro 档以 NPU 算力解锁 360° 融合/VSLAM | 〔官方+产品〕 |
+| 6 | **端云一体的技能生态** | WorkBuddy 数万 Skill + PrimeStore/RPK 分发 + source=INSTA360 的第三方硬件联动枚举——机器人作为" Skill 执行体"的平台化打法 | 〔官方枚举+产品〕 |
+
+## 七、关键竞争力与短板
+
+**竞争力**（按差异化强度排序）：
+
+1. **交互完成度**：语音（唤醒-ASR-TTS 仲裁-记忆）→表情（23）→灯效（23）→触摸→灯带的**全表达通道**均有正式 API 与优先级治理——在同价位消费级机器人中交互栈最完整；
+2. **双形态独占**：41 态状态机+变形序列+形态自适应感知，19999/29999 元价位无直接竞品（Go2 纯四足、NEO 未交付国内）；
+3. **动作资产深度**：90+ 内置动作 × 三种生成管线（状态机/神经网络/示教录制），且对开发者全量开放调用；
+4. **工程治理成熟度**：统一响应模型、source 溯源、task_id 异步、分级权限、看门狗分层——SDK 即架构文档，工程规范高于多数国内同行首版 SDK；
+5. **智元系生态杠杆**：数据（AgiBot World）→模型（GO-1 同源技术）→云脑（WorkBuddy）→技能市场闭环。
+
+**短板与风险**：
+
+1. **感知接口开放度低**：开发者拿不到深度图/点云/ToF/IMU 数据（仅 RGB JPEG/RTSP），自建视觉伺服成本高（官方技能 README 自认缺口）；
+2. **交互接口半开放**：ASR 只读不可注入、TTS 无完成事件（200ms/字估算 hack）、唤醒引擎黑盒——做不了精细对话编排；
+3. **配置态管理粗糙**：输入源修改不持久化、SetMcMotion 的 model/resource 字段未实现、部分接口 Beta（0.1 版）；
+4. **网络信任模型**：开发者模式=局域网裸 DDS 无认证（对照宇树 Go2 RCE 前科）；
+5. **生态早期**：技能市场/社区规模远小于宇树（Go2 全球科研社区），SDK 迭代节奏待观察。
+
+---
+
+## 附录：信源清单
+
+- 官方 SDK 仓库：atomgit.com/primebot/t1-sdk（含《接口说明.md》《PrimeBot_SDK快速入门与集成指南.md》aimdk_msgs/examples，2026-10-24 克隆核验）
+- 官方消息定义：aimdk_msgs 62 个 .msg/.srv（hal/mc/interaction/agent/config/common 六子模块）
+- 官方开源组织：atomgit.com/primebot（t1-sdk、q1-sdk、q1-dev-guide、t1-urdf、arm-native-toolchain、x86-cross-arm-toolchain、carry-clothes 等技能仓库）
+- 官方产品/口径：primebot.com/t1.html、dev.primebot.com、skillhub.primebot.com；官方 B 站"我是启元T1，大家也可以叫我'元仔'"（唤醒名口径）
+- WorkBuddy 接入报道（雷锋网/知乎 2026-09）：启元机器人接入 WorkBuddy，调用上万种 Skill
+- 经核验的既有调研：本仓库 quadruped-software-architecture.md v1.2（含官网星号脚注、发布会口径、URDF 主动轮结论）
