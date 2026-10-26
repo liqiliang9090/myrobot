@@ -2,8 +2,9 @@
 
 | 文档信息 | |
 |---|---|
-| 版本 | v1.0 |
-| 日期 | 2026-10-24 |
+| 版本 | v1.1 |
+| 日期 | 2026-10-26 |
+| v1.1 修订 | 新增第五章「系统部署视图」：板卡清单与硬件架构（大脑板/运控板 SoC·核数·算力）、板内嵌入式控制单元、机外设备、各板进程部署与软件模块映射（yamo 进程表×板卡归属判定）、部署视角关键机制补充（网络带宽测算/FastDDS 与内核参数/存储目录与 yamo 接入/五层权限与安全/时间同步与可观测性/升级与多机/档位矩阵/部署选型与工具链/故障排查速查）；原第五/六/七章顺延为第六/七/八章 |
 | 分析对象 | 启元 T1 / T1 Pro（官方 SDK 不区分型号，单一 T1 SDK 覆盖两档硬件；T1 Pro 差异在产品功能层，见 §1.6） |
 | 主要信源 | 官方 SDK 仓库 atomgit.com/primebot/**t1-sdk**（2026-10-24 克隆）：《接口说明.md》14064 行、《PrimeBot_SDK快速入门与集成指南.md》1178 行、aimdk_msgs 消息源码（62 个 .msg/.srv）、examples（18 个场景例程 × C++/Python 双语言）；辅以 primebot.com 产品页与官方发布会口径（已经 [quadruped-software-architecture.md](quadruped-software-architecture.md) v1.2 逐条核验） |
 | 证据标注 | 〔官方〕= SDK/官方文档明文；〔推导〕= 由官方证据链严格推出（证据随文标注）；〔推测〕= 基于技术体系的合理推断，无直接官方证据 |
@@ -588,9 +589,319 @@ sequenceDiagram
 
 ---
 
-## 五、整体系统架构推导
+## 五、系统部署视图：板卡、算力与进程分布
 
-### 5.1 架构总图
+> 本章回答：T1 Pro 上除了运控板还有什么板？各板什么硬件架构、多少核/多少算力？各板上跑什么进程、这些进程承载哪些软件模块和服务？并从部署视角补充容易忽略的关键机制。
+> 截至 2026-10 官方无拆机报告，硬件细节以 SDK 文档 + 官网口径为界，越界处逐条标注。
+
+### 5.1 板卡清单与硬件架构
+
+#### 5.1.1 计算主板：共两块（"双板架构"〔官方〕）
+
+| 板卡 | 官方职责〔官方〕 | 硬件架构 | CPU 核 | AI 算力 | 内存 | OS/运行时 | IP | 证据 |
+|---|---|---|---|---|---|---|---|---|
+| **运控板**（"小脑板"，配置代号 soc0〔推导〕） | 底层硬件抽象（HAL）+ 运控算法（MC）+ 各类基础交互服务（表情、语音等） | ARM64 SoC，**具体型号官方未披露**；证据：需 ARM 交叉编译工具链部署（docker_x86_cross_arm / arm-native-toolchain 仓库）、板跑完整 Linux（有 cgroup/SSH/PulseAudio/systemd 类服务） | 未披露（官方仅定性"**资源极度有限**"，主要保障实时运动控制，不建议部署应用） | 未披露（无独立 NPU 口径） | 未披露 | **Ubuntu 22.04 + ROS 2 Humble**（板载可直接编译运行 SDK〔官方〕）+ yamo 进程管理 + cgroup 分组 | 10.1.1.100（出厂固定） | 〔官方〕职责/IP/OS；SoC 型号未公开 |
+| **大脑板**（"大脑板"，配置代号 soc1〔推导〕） | 核心 AI 算法、感知、规划及部分复杂的**供应商程序** | **T1 Pro：NVIDIA Jetson Orin Nano 模组**（SDK 明示支持"Orin 与 RK 两平台"〔官方〕，Pro 搭 Orin Nano〔官方产品+媒体口径〕） | **6 核 Arm Cortex-A78AE** | **~40 TOPS（INT8，媒体口径）**；GPU 1024 CUDA 核 + 32 Tensor 核 | 8GB LPDDR5（68GB/s） | Linux（Ubuntu 22.04 + ROS 2 Humble）+ JetPack/CUDA/TensorRT 栈〔推导〕 | 10.1.1.101（出厂固定） | SoC/核数/算力=NVIDIA 公开规格；装态为推导 |
+| （对照）T1 基础版大脑板 | 同上 | **RK 平台**（具体型号未公开；推断 RK3588 级） | 8 核（4×A76 + 4×A55）〔推断〕 | ~6 TOPS NPU〔推断〕 | LPDDR4/5 | 同一套软件栈（Docker 工具链含 orin/ 与 rk/ 两套 Dockerfile，**开发者代码不分叉**〔官方〕） | 10.1.1.101 | 〔官方"双平台"+推测〕 |
+
+> 板卡代号证据链：SSH 密钥目录以 `<机器人SN>_soc0` 命名、"运控板和大脑板的密钥可能不同"〔官方〕→ 存在 soc0/soc1 两块 SoC；进程配置文件 `t1_v2d_soc0_config.yaml`（t1=机型，v2d=硬件/版本代号，含义未公开）的 apps 里含 `mc`〔官方〕→ 含 mc 的 soc0 判定为运控板〔推导〕。
+
+#### 5.1.2 板内嵌入式控制单元（非独立"计算板"，但属部署视图）
+
+| 单元 | 数量 | 架构/载体 | 跑什么 | 证据 |
+|---|---|---|---|---|
+| **关节执行器 MCU** | 14（含后足 2 主动轮关节） | 每关节独立驱动电路〔推导〕 | FOC 电流环（kHz 级〔推测，行业惯例〕）、限位/限速/温控、本地看门狗；越限**强制关断**、<100Hz 指令断流触发硬件看门狗 | 〔官方〕JointState 上报线圈温度/电机温度/电压、"底层固件拦截""硬件 Watchdog"表述 |
+| **BMS 电池管理 MCU** | 1 | 电池包内 MCU，固件可升级（status bit21 新/老固件） | 29 位电池状态采集、充放电保护、长短按关机判定（power_request）、无线充电检测 | 〔官方〕Bms.msg |
+| **音频芯片** | 1 | ALSA 声卡 `platform-aw89403_sound`（专用音频 DSP/功放，8 通道输入） | 6 麦 + 2 回采通道采集、扬声器输出（经运控板 PulseAudio） | 〔官方〕录音设备名 |
+| **变形舵机控制器** | 1 | 舵机驱动（位置 0–90°，100–1000 步/s） | 四足⇄双足躯干抬升机构的独立伺服 | 〔官方〕SetServo |
+| **灯带/颈灯/探照灯驱动** | 若干 | LED 驱动 | 23 种灯效渲染（含变形/充电/低电语义灯语） | 〔官方〕LedStripCommand |
+| **触摸传感** | 2（背部/胸部） | 电容触摸 IC | 单击~六击/滑动事件识别 | 〔官方〕TouchState |
+| **头部表情屏驱动** | 1 | 屏幕驱动板（归属板卡未文档化） | 23 种表情 + mp4 播放 | 〔官方〕PlayEmotion |
+
+#### 5.1.3 机体外设备（部署拓扑的外围节点）
+
+| 设备 | 接入方式 | 角色 | 证据 |
+|---|---|---|---|
+| 手机 App（PrimeBot App） | WiFi/BT〔推测〕→ app_proxy 通道 | 遥控/开发者模式配置/示教录制 | 〔官方〕输入源 app_proxy=60、开发者模式在 App 里切换 |
+| 实体遥控器 RC | 独立链路 → source=rc（优先级 80） | 工业级遥控 | 〔官方〕 |
+| VR 终端 | source=vr（优先级 70） | 远程操控 | 〔官方〕输入源表 |
+| Insta360 相机 | source=INSTA360 | 拍摄联动触发 | 〔官方〕McTaskSource 枚举 |
+| 回充桩（Pro） | 无线充电检测 bit26 | VSLAM 回充目标 | 〔官方〕Bms 位 + 产品口径 |
+| 蓝牙音箱（Pro） | 蓝牙（audio_device_list 的 bluetooth 设备） | 外放输出 | 〔官方〕设备列表 |
+| 开发者 PC | 网线直连（建议 10.1.1.99） | 第三块"算力节点"：SDK 程序可跑在 PC 而非板载 | 〔官方〕 |
+
+**传感器接入分布**（部署视角易漏点）：头部双目相机接**运控板**（RTSP 流从 10.1.1.100:2554 出〔官方〕）；ToF×5 + 鱼眼×2 + IMU **未开放任何 SDK 接口**，接入位置未公开——Pro 档 360° 融合/VSLAM 需要它们，推断直连**大脑板**（Orin）〔推测〕；音频/触摸/BMS/关节接运控板〔官方接口归属〕。
+
+### 5.2 各板进程部署与软件模块映射
+
+#### 5.2.1 运控板（10.1.1.100）进程表
+
+| 进程/服务 | 类型 | 承载模块（对应第三章） | 提供的接口/能力 | 证据 |
+|---|---|---|---|---|
+| `mc` | yamo 应用（第一阶段启动） | **M6 MC 运动控制服务**（ROS2 节点 `/mc_ros2_node`） | SetMcAction/GetMcAction/SetMcMotion/SetMcPresetMotion/SetMcInputSource/GetCurrentInputSource + /aima/mc/locomotion/velocity + /aima/mc/custom/joint/command；内部：41 态状态机、任务队列（task_id）、输入源仲裁器 | 〔官方〕节点名 + soc0 配置含 mc |
+| `/hal_camera` | ROS2 节点 | **M7 HAL-视觉** | CaptureJpegImage、RTSP 流服务（2554） | 〔官方〕节点名 |
+| `/hal_audio` | ROS2 节点 | **M7 HAL-音频 + M5 交互服务（语音部分）** | Get/SetVolume、Get/SetMute、PlayAudioFile、audio_device_list；TTS 调度入口 | 〔官方〕节点名 |
+| 交互基础服务进程（表情/灯效/触摸/舵机/关机等 srv 提供方，进程名未逐一披露） | yamo 应用 | **M5 交互服务 + M7 HAL** | PlayTts/PlayEmotion/LedStripCommand/SetNeckLight/SetServo/ShutdownTask、/aima/hal/touch/state、/aima/hal/bms/state、joint/state 上报 | 〔官方〕"运控板负责基础交互服务" + 服务存在 |
+| PulseAudio | 系统服务 | M7 音频底座 | TCP 6001（播放）/4713（8ch 录音）、unix socket、蓝牙音频切换 | 〔官方〕协议与端口 |
+| RTSP 流媒体 | 系统服务 | M7 | 2554 端口双目流 | 〔官方〕 |
+| `process_manager`（yamo）+ `sys_guard` + `node_control_worker` + cgroup worker | yamo 应用（sys_guard/mc 第一阶段；其余第二阶段） | **M10 系统管理底座** | 进程监管（yamo em doctor/start/stop-app）、两阶段自启动、cgroup 分组 | 〔官方〕配置文件与命令 |
+| SSH（密钥认证，run 用户） | 系统服务 | — | 板卡运维通道 | 〔官方〕 |
+| **PrimeMotion 实时内核** | **载体未公开**（运控板 Linux 实时域，或板内独立 MCU〔推测〕） | **M8** | 多专家混合 RL + WBC + 关节伺服闭环、安全兜底 | 〔产品口径 + SDK 间接证据〕 |
+
+#### 5.2.2 大脑板（10.1.1.101）进程表
+
+| 进程/服务 | 类型 | 承载模块 | 提供的接口/能力 | 证据 |
+|---|---|---|---|---|
+| `agent` | yamo 应用 | **M1 Agent 对话智能体** | /aima/agent/asr_result 发布、意图理解、对话编排、云端 LLM/WorkBuddy 调用 | 进程名〔官方 yamo 示例〕；**板卡归属为推导，见 5.2.3** |
+| `task_engine` | yamo 应用 | **M2 Task Engine** | ShutdownTask（task engine 层〔官方 srv 注释〕）、自动/定时任务编排 | 同上 |
+| 感知规划服务（输入源 `pnc`，进程名未披露） | yamo 应用 | **M3 感知规划** | /aima/mc/locomotion/velocity（source=pnc）、跟随/避障/VSLAM/回充（Pro 档功能） | 输入源名〔官方〕；进程/板卡〔推导：属"核心算法"〕 |
+| 供应商程序（`abox` 等） | yamo 应用（第二阶段） | 外部合作方软件 | 未公开（Insta360 联动、云通道等〔推测〕） | app 名〔官方 soc0 配置；职责未明〕 |
+| `app_proxy` | yamo 应用（第二阶段） | **M4 App 代理** | 手机 App/云指令→SDK 服务转发（source=app_proxy=60） | 输入源〔官方〕；**归属存疑，见 5.2.3** |
+| AI 推理运行时 | 系统栈 | 模型层 | ASR/TTS 本地缓存、NPU 推理（Pro 档重感知功能） | 〔推导〕 |
+
+#### 5.2.3 归属判定依据与不确定性（重要）
+
+官方两处示例存在张力，**进程→板卡的逐一映射无法完全确证**：
+
+1. 《快速入门》§1 总述：运控板=HAL/MC/交互基础服务；大脑板=核心算法/感知/规划/供应商程序〔官方〕；
+2. 但 soc0（含 mc，判为运控板）的配置示例 stage2 里出现 `app_proxy`、`abox`；`yamo em doctor` 示例输出中 `agent`、`task_engine`、`mc` 同板并列〔官方示例〕——若示例为真实分布，则 agent/task_engine/app_proxy/abox **在运控板**上（"交互型 agent 贴音频硬件、感知认知在大脑板、LLM 在云"的分工也自洽〔推导〕）；
+3. **实机验证方法**（拿到机器后 5 分钟可做）：分板 SSH（10.1.1.100 / 10.1.1.101，各自密钥）→ 各跑 `yamo em doctor` + `ros2 node list`，即得权威进程分布。
+
+#### 5.2.4 开机时序与进程监管〔官方〕
+
+- **两阶段自启动**：stage1（`sys_guard`、`mc` 等）启动后延时 **1500ms** → stage2（`app_proxy`、`abox`、用户模块等）启动后延时 **8000ms**——先保命（运控/守护）再上业务（智能/交互）；
+- 进程由 process_manager（yamo）统一拉起监管，配 cgroup 资源分组；`yamo em stop-app/start-app <name>` 手动控制；
+- 用户模块接入方式：部署到 `/robot/software/<module>/` + 修改对应板 `t1_xxx_socX_config.yaml` 的 apps 段 + stage2 列表（见《快速入门》§4）。
+
+### 5.3 部署视角的关键补充内容
+
+#### 5.3.1 网络拓扑与带宽预算
+
+**（1）IP 规划与接入**〔官方〕
+
+| 节点 | IP | 说明 |
+|---|---|---|
+| 运控板 | 10.1.1.100（出厂固定） | RTSP(2554)/SSH/TCP 音频(6001/4713) 均在此板 |
+| 大脑板 | 10.1.1.101（出厂固定） | SSH 密钥与运控板不同 |
+| 开发 PC | **10.1.1.99（官方建议）** | 配置方法：Settings→Network→有线网卡→IPv4=Manual，地址 10.1.1.99 / 掩码 255.255.255.0 / 网关留空；验证：`ping 10.1.1.100`、`ping 10.1.1.101` |
+
+- 接入前提：**必须先在 App 切换开发者模式并重新上下电**，否则"外部设备无法发现机器人节点，网口也无法连接"〔官方原话〕；
+- 机器人连 WiFi 后服务同样可用（`hostname -I` 查无线 IP，RTSP 换该 IP 即可），但**高频开发场景官方推荐网线直连**；
+- 多网卡主机（有线+WiFi 并存）会绑错网卡导致发现失败，官方建议**临时禁用无关网卡**〔官方〕。
+
+**（2）通信配置三件套**〔官方 §6.7〕
+
+- **FastDDS profile**（SDK 自动加载，无需手配）：`source install/setup.bash` 后经 ament 环境钩子自动设 `RMW_IMPLEMENTATION=rmw_fastrtps_cpp` 与 `FASTRTPS/FASTDDS_DEFAULT_PROFILES_FILE=<sdk>/share/aimdk_msgs/config/fastdds_profiles.xml`；profile 要点：UDPv4 传输、关闭 builtin transports、收发缓冲各 **20M**（20971520）：
+
+```xml
+<transport_id>aimdk_udp_transport</transport_id>
+<type>UDPv4</type>
+<sendBufferSize>20971520</sendBufferSize>
+<receiveBufferSize>20971520</receiveBufferSize>
+```
+
+- **内核参数**（SDK 不会自动改，须手动）：必须满足 `net.core.rmem_max ≥ receiveBufferSize` 且 `wmem_max ≥ sendBufferSize`，官方建议统一 24M——临时：`sudo sysctl -w net.core.rmem_max=25165824`（wmem 同）；持久化：写入 `/etc/sysctl.d/99-primebot-sdk.conf` 后 `sudo sysctl --system`；不配置的典型症状：**高频 topic 丢帧、时通时不通、pub/sub 帧率不足**；
+- **网卡白名单 interfaceWhiteList**（可选）：profile 中默认注释；多网卡丢帧/超时时取消注释并填**本机通信网卡 IP**（如 10.1.1.99，注意不是机器人 IP）+ 127.0.0.1，改后重新 `colcon build` + `source`；
+- **防火墙**：DDS 发现走组播端口，而**数据走随机大端口（数万起）**，部分系统默认防火墙会拦——官方处置：`sudo ufw disable`〔官方〕；
+- **SHM 传输**：profile 已含 `aimdk_shm_transport` 描述符但**默认只启用 UDP**；同机多进程（如程序直接部署在运控板上）可按需启用 SHM 并调 `segment_size`〔官方〕。
+
+**（3）带宽与负载测算**〔估算〕
+
+| 数据流 | 频率/规格 | 单帧/码率估算 | 折合带宽 |
+|---|---|---|---|
+| /aima/hal/joint/state | 500Hz × 14 关节 | 每关节 name≈22B + 3×float64=24B + 2×int16 + 1×uint8 ≈ 51B → 全帧 ≈ 0.75–1.2KB（含 CDR 对齐） | **≈3–6 Mbps** |
+| /aima/mc/locomotion/velocity | 50–100Hz | ≈250B | ≈0.1–0.2 Mbps |
+| TCP 4713 录音 | 8ch × 48kHz × S16LE | 768KB/s | ≈6.1 Mbps（持续录音时） |
+| TCP 6001 播放 | mono 48kHz × S16LE | 96KB/s | ≈0.8 Mbps |
+| RTSP 双目流 | 每目一路 | 1080p30 H.264 量级〔估算〕 | 单目 2–8 Mbps |
+| BMS/touch/ASR/指令 | 1Hz/事件级 | <1KB | 可忽略 |
+
+结论：全部叠加 ≈ 15–25Mbps，千兆网大幅富余；**真实瓶颈不在带宽，在运控板 CPU（"资源极度有限"）与 20M UDP 缓冲的搭配**——所以官方把内核调优写成必做步骤。板间（运控板⇄大脑板）物理带宽官方未披露（媒体称 2.5Gbps，**非官方口径**）。
+
+#### 5.3.2 存储目录规范与板载模块接入〔官方〕
+
+**（1）目录规范全表**
+
+| 路径 | 用途 | 特性与约束 |
+|---|---|---|
+| `/robot/software/<module>/` | 板载模块部署**唯一合法位置** | 启动脚本必须在此（绝对路径，不支持 `~`/相对路径），否则 yamo 不接管；例：`/robot/software/my_module/bin/start_my_module` |
+| `/robot/software/process_manager/bin/cfg/` | yamo 进程配置 | `t1_xxx_socX_config.yaml` 按板区分；**改前必备份**，只增不删（不动已有 apps 条目） |
+| `/robot/persist/log/` | 模块/系统日志 | 重启保留；**有定期清理机制**；自定义模块日志建议写到此处的项目子目录；`/tmp` 下的日志重启即丢且空间小 |
+| `/robot/persist/bag/` | ROS2 bag 数据包 | 数据回流/复盘用 |
+| `/home/user/*` | 资源文件（音视频、模型权重、配置） | ⚠️ **OTA 后非持久化分区可能丢数据**，须自备份；官方建议建项目名/公司名子目录避免与系统资源冲突 |
+| `/opt` | 长期运行的第三方组件 | 推荐位置 |
+| `/robot/userdata/sd/custom_motions/` | App"手把手教学"录制的自定义动作 | 文件名格式 `<用户输入名称>_<时间戳>_<编号>.csv`（120fps、固定 10 列） |
+| 禁区 | `/etc` 等系统目录 | 官方明示勿随意写入，防服务异常 |
+
+**（2）yamo 自启动接入四步**〔官方 §4，字段级〕
+
+1. 脚本部署至 `/robot/software/<module>/bin/`，`chmod +x`；脚本要求：处理 SIGTERM/SIGINT（优雅退出）、日志路径从环境变量 `LOG_PATH` 读（由配置注入）；
+2. 改对应板的 `t1_xxx_socX_config.yaml`，在 `apps:` 段追加，字段：`path`（必填，绝对路径）、`sudo`（必填，false=普通用户/true=root）、`stderr`（建议，错误日志路径）、`env`（选填，模块专属环境变量如 `LOG_PATH: /robot/persist/log/my_module`）；
+3. 把模块名加进 `startup_stages` **第二阶段** apps 列表末尾（第一阶段 `sys_guard`、`mc` 等不动，两阶段间隔分别为 1500ms/8000ms）；
+4. 验证：先手动跑脚本 → 重启后 `yamo em doctor` 应显示模块 Running；日常管理 `yamo em start-app/stop-app <name>`。
+
+**（3）日志导出标准流程**〔官方 §6.8〕：SSH 登录板卡 → `tar -czf /robot/persist/log/robot_logs_$(date +%Y%m%d_%H%M%S).tar.gz /robot/persist/log/`（bag 同理，**不要打包到 /tmp**）→ `scp -i ./<SN>_soc0/id_ed25519 run@<板IP>:/robot/persist/log/robot_logs_*.tar.gz ./` → 随问题附上：软件版本 + SDK 版本 + `yamo em doctor` 快照 + `ros2 node/topic list` + 复现步骤。
+
+#### 5.3.3 安全与访问模型（部署安全清单）
+
+**（1）开发者模式开启流程**〔官方 §2.1.1，逐步〕
+
+App 连接机器人 → 设置 → 「开发者功能」→ 首次弹出《二次开发功能启用须知》（**开启后不再享受维保服务**）→ 运行模式由「标准模式」切「开发者模式」→ 选择开发层级（基础/高级）→ 保存配置 → **重新上下电生效**；退出开发模式走同样流程切回标准模式。注意：标准模式下"外部设备无法发现机器人节点，网口也无法连接"〔官方原话〕——这是产品级网络封闭，不是普通的防火墙。
+
+**（2）五层权限闸门**〔官方 §5，表格化〕
+
+| 层级 | 维度 | 选项与现状 |
+|---|---|---|
+| 一 | 运行模式 | `Standard`：全闭环，仅运行官方认证组件，**不接受外部控制指令**；`Develop`：开启外部接入通道，允许注入自定义控制逻辑与算法模型 |
+| 二 | 开发方式 | `API`（RESTful/gRPC，跨语言轻量集成）：**暂未支持**；`ROS2`（DDS，高频强时效）：当前默认全局支持（需重启生效） |
+| 三 | 开发层级 | `Basic` 基础开发：**无损能力增强**——原厂业务与安全策略保持完整，外部指令并发注入；`Advanced` 高级开发：**深度逻辑接管**——允许关闭特定官方模块，获取核心资源（传感器裸流、底层运控）独占权 |
+| 四 | 领域设置 | 可选接管：运动控制 / 语音交互 / 作业规划 / 传感器数据（范畴官方持续拓展中） |
+| 五 | 原子功能开关 | **当前仅开放一项**：`domains.mc.low_level_dev` 低层运控开发 = ①授权全身关节直接指令下发；②**本体高层运动控制功能需手动关闭** |
+
+**（3）SSH 访问模型**〔官方 §2.1.5〕：仅密钥认证（禁密码）；私钥由售后**邮件发放**，目录以 `<机器人SN>_soc0` 命名（每台机器不同）；**运控板与大脑板密钥不同**；登录 `ssh -i ./<SN>_soc0/id_ed25519 run@<板IP>`；密钥目录需 `sudo chown -R $USER:$USER` + `chmod 600`。
+
+**（4）低层关节直控的安全操作序列**（Advanced 域部署必读，综合官方多处警示）：
+
+App 切「高级开发 + 低层运控域」→ 重启 → **确认高层运控已关闭**（否则高低层指令冲突会"引发剧烈物理震颤"〔官方〕）→ 机器人放平或悬空 → 500–1000Hz 指令流（Ruckig 限幅、单帧步进 ≤0.2rad、stamp 严格单调）→ **退出前必发全量软关机帧 `stiffness:0, damping:5`**，严禁直接断流（<100Hz 触发硬件看门狗啸叫）。
+
+**（5）残余风险评估**〔官方事实 + 本文分析〕
+
+- **DDS 层无认证无加密**：开发者模式下，同网段任意主机接入即可订阅/发布全部话题与服务（含 `/aima/hal/joint/command` 关节直控）。`ROS_DOMAIN_ID` 只是**隔离**不是**安全**（ID 可枚举）。部署纪律：10.1.1.0/24 必须物理可信——开发用网线直连、勿桥接到不可信局域网/公网（对照宇树 Go2 DDS 无认证 RCE 前科 CVE-2026-27509/27510）；
+- **恢复出厂**：官方明示**不建议自行用三方工具强刷固件**（有丢失核心授权/硬件闭锁风险），系统损坏应停手联系售后〔官方 §6.6〕。
+
+#### 5.3.4 时间同步与可观测性
+
+**（1）时间约束**〔官方〕
+
+- `MessageHeader{stamp, frame_id, sequence, meas_stamp}`：`stamp` **必须源于机载系统时钟且严格单调递增**——底层总线驱动会**自动丢弃任何乱序或重复时间戳的数据包**（关节指令流尤其致命：丢帧 → 频率跌破 100Hz → 硬件看门狗）；
+- 跨板/外部部署的节点必须与机器人对时后取机器人系统时钟，不能用本机未同步时钟；官方未文档化对时机制（NTP/chrony/PTP 均未提及）——**部署前需实机验证**〔缺口〕；`meas_stamp`（测量时间戳）语义亦未文档化〔缺口〕。
+
+**（2）可观测性命令集**〔官方散见 §2/§4/§6，汇总〕
+
+| 目的 | 命令 | 正常预期 |
+|---|---|---|
+| 链路连通 | `ping 10.1.1.100` / `ping 10.1.1.101` | ttl=64 亚毫秒级 |
+| 节点发现 | `ros2 node list` | 出现 `/hal_camera`、`/hal_audio`、`/mc_ros2_node` 等（无需编译 SDK 即可查） |
+| 话题拓扑 | `ros2 topic list`（加 `-t` 带类型） | `/aima/hal/..`、`/aima/mc/..` 系列 |
+| 服务拓扑 | `ros2 service list` | `/aimdk_5Fmsgs/srv/..`、`/hal_audio/..` 系列 |
+| 数据验证 | `timeout 5 ros2 topic echo /aima/hal/bms/state --once` | 输出电压/电流/SOC 报文 |
+| 进程健康 | `yamo em doctor` | 各 app `Running`（表格含 PID/启动时间/EM 状态） |
+| 资源水位 | `top -o %CPU` / `free -h` / `df -h` / `top -b -n 1 \| grep mc` | 见下方阈值 |
+
+**资源异常阈值**〔官方 §6.9〕：CPU 长期 >90%、可用内存 <200MB、磁盘剩余 <10% ——任一命中即可能导致运行异常。
+
+**（3）三个高频"假故障"**〔官方明示的坑〕
+
+1. **新建 Client 首次请求丢失**：ROS2 Client 即使 `wait_for_service` 成功，底层匹配仍需毫秒级（跨芯片场景明显）——对策：**节点初始化时一次性建 Client 全局复用**；必须动态创建时，就绪后额外等 ~200ms 或首调重试；
+2. **事件型话题无数据**：`/aima/hal/touch/state` 等仅状态变化时上报——监听无输出不代表故障，物理触发一次即可验证；
+3. **TTS 无播报完成事件**：官方未开放播报结束通知，需按 **~200ms/字**估时（如"好呀看我的"5 字 ≈1s 后再接动作）。
+
+#### 5.3.5 升级、版本与多机
+
+- **整机系统 OTA：官方口径"当前暂不支持"**（SDK 快速入门 §2.1.6 注，2026-10 时点）〔官方〕——意味着部署变更（系统层）主要靠售后渠道；**数据自管理是硬要求**：OTA 一旦开放，`/home/user` 等非持久化分区有丢数据风险，核心资源须例行备份到 `/robot/persist/` 或外部；
+- **固件/资产版本碎片化证据**（部署兼容性检查点）：BMS 固件有新/老版本之分（status bit21）〔官方〕；动作库持续增补且新旧并存（`DANCE_MOVE=2021` 与 `DANCE_MOVE_UPDATED=2044`、"蛇形舞动 2"与"蛇形舞动 2 导演剪辑 2043"）〔官方枚举〕——跨版本部署的二开程序应**以枚举名而非裸数值**下发动作，并对 `REASON_NOT_SUPPORTED(26) 当前机型不支持` 做容错；
+- **版本信息采集**：SSH 登录板卡可查软件版本〔官方〕；向官方反馈问题须附机器人软件版本 + SDK 版本 + 日志包 + 模块状态快照；
+- **多机部署**：同一局域网多台机器人须**逐台配置不同 `ROS_DOMAIN_ID`**（出厂默认 0）〔官方〕；注意 Domain 只做流量隔离，不构成访问控制（见 5.3.3）。
+
+#### 5.3.6 档位矩阵：同一套部署跨两档硬件
+
+| 维度 | T1 基础版 | T1 Pro | 证据 |
+|---|---|---|---|
+| 大脑板 SoC | RK 平台（~6 TOPS 级〔推断〕） | Orin Nano（6 核 A78AE + ~40 TOPS + 8GB） | 〔官方双平台+媒体〕 |
+| 运控板 | **相同**（官网速览运动参数逐项一致：四足 3m/s、轮足 2.5m/s、30° 坡、15cm 越障；整机仅差 0.5kg，集中在头部算力模组） | 同左 | 〔官方参数+推断同硬件〕 |
+| 软件栈/SDK | **完全同一套**：单一 t1-sdk 不分型号；Docker 工具链含 orin/ 与 rk/ 两套 Dockerfile，**开发者代码不分叉** | 同左 | 〔官方〕 |
+| 仿真/模型 | 共用官方 t1-urdf（STL+MuJoCo XML+RViz/Gazebo launch） | 同左 | 〔官方〕 |
+| RPK 技能包 | manifest 的 target.models 同列 T1 与 T1-Pro，技能跨档通用 | 同左 | 〔官方技能仓库〕 |
+| 感知功能 | 前向跟随/ToF 避障等轻感知 | 360° 多传感融合、VSLAM 建图回充、运镜拍摄、侧后向跟随、自动场景变形**独占** | 〔官方星号脚注〕 |
+| 二开深度 | 图形化编程/零代码编排 | 深度二次开发（官网"二次开发\*"带 Pro 星号） | 〔官方产品页〕 |
+
+部署含义：二开代码写一次可跑三处（PC/运控板/大脑板）×两档机型；但**依赖 Pro 档算力的功能（重感知类）在基础版上不可用**，程序应对 `REASON_NOT_SUPPORTED(26)` 做机型容错。
+
+#### 5.3.7 用户代码部署位置选型与工具链（三选一）
+
+| 部署位置 | 适合放什么 | 工具链/编译 | 硬约束 |
+|---|---|---|---|
+| 开发 PC（10.1.1.99，x86） | 开发调试、GPU 大算力、可视化、离线分析 | 本机 Ubuntu 22.04 + ROS2 Humble，或 Docker `docker_x86_native_x86`；`colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release` → `source install/setup.bash` → `python3 examples/python/demo.py` / `ros2 run aimdk_examples_cpp demo` | 依赖网络；断网指令流有看门狗兜底 |
+| 运控板（ARM，资源受限） | 贴运动硬件的**低延迟轻逻辑**（自定义关节控制、状态桥接） | x86 上用 `docker_x86_cross_arm` 交叉编译出 ARM 产物再部署，或板载直接编译 | **"运控板资源极度有限，主要保障实时运动控制，不建议部署应用或存储大数据"**〔官方原话〕；接管低层须 Advanced+低层域 |
+| 大脑板（Pro=Orin，ARM） | AI 推理、视觉处理、常驻服务、供应商程序位 | 同 ARM 工具链（orin Dockerfile） | ARM64 环境；与官方核心算法共享算力 |
+
+**两种代码集成模式**〔官方 §3，要点〕：
+
+- **SDK 内开发**（小工程推荐）：Python 直接在 `examples/python/` 加脚本即跑；C++ 在 `examples/cpp/src/` 加 `.cpp` 并向 `CMakeLists.txt` 顶部 `EXAMPLE_TARGETS` 列表追加目标名（foreach 自动建目标）；需要 OpenCV/Ruckig 时按 `get_video_stream`/`joint_control` 样例追加条件块；
+- **第三方独立集成**（已有工程推荐）：Python 用环境叠加——SDK 放 `deps/` 合并 `colcon build`，`run.sh` 依次 `source /opt/ros/humble/setup.bash` → `source ./deps/install/setup.bash` → 激活 venv → 拉起业务；C++ 用 `FetchContent` 封装 `GetPrimebotSDK.cmake` 拉 `aimdk_msgs`/`ruckig_for_primebot`，**显式链接 `aimdk_msgs__rosidl_typesupport_cpp` 与 `..._fastrtps_cpp`**，并设 `CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE` 解决 `.so` 查找；
+- 编译红线〔官方〕：**路径不得含中文/空格**（CMake 解析必挂）；Ruckig Python 模块需 `pip install nanobind`；OpenCV 4.13 为源码交付（`aimdk_opencv` 包），无预编译 `.so`。
+
+#### 5.3.8 部署故障排查速查〔官方 FAQ §6 全量提炼〕
+
+| # | 现象 | 根因（按概率排序） | 处置 |
+|---|---|---|---|
+| 1 | `ros2 node list` 空 / 仅 `/rosout` | ①网线/IP 不通（先 `ping` 两块板）②`ROS_DOMAIN_ID` 不一致（机器人默认 0，PC 有杂散值）③未切开发者模式或未重启生效 ④多网卡绑错（同时连 WiFi+有线） | 修链路；`echo $ROS_DOMAIN_ID` 对齐；重开开发者模式；**禁用无关网卡** |
+| 2 | 节点可见但 `topic echo` 超时 / 时通时不通 / 帧率不足 / `Service not available` | ①防火墙拦**随机大端口 UDP**（发现用组播能过、数据过不了）②内核缓冲 < FastDDS profile（20M）③未 `source` SDK 环境（报 `Cannot determine type`，无法反序列化）④事件型话题本就无数据 | `sudo ufw disable`；sysctl 调 24M；重新 source；物理触发一次 |
+| 3 | `colcon build` 失败 | ①**路径含中文**（官方重点警示，CMake 解析必挂）②缺 `python3-colcon-common-extensions`/`rosidl` 生成器 ③编译前未 `source /opt/ros/humble/setup.bash` ④g++ 过低（Ubuntu 22.04 自带即满足） | 全英文无空格路径；补装依赖；先 source 再 build |
+| 4 | `colcon: command not found` | pip `--user` 安装后 `~/.local/bin` 不在 PATH | PATH 补 `~/.local/bin` 或改用 apt 安装 |
+| 5 | 首次服务调用"发了没反应" | ROS2 Client 匹配滞后（跨芯片常见） | Client 全局复用；动态创建后延时 200ms 或首调重试（见 5.3.4） |
+| 6 | 关节控制中电机啸叫/异常 | 指令频率跌破 100Hz 触发硬件看门狗 | 保证 500–1000Hz 稳定发布；退出前发 `stiffness:0, damping:5` 软关机帧 |
+| 7 | 系统损坏/服务拉不起来 | 误删系统文件、错误装载三方库 | **勿自行三方强刷**（核心授权丢失/硬件闭锁风险）→ 停手联系售后 |
+
+#### 5.3.9 部署视图总图
+
+```mermaid
+flowchart TB
+    subgraph EXT["机外设备"]
+        APP["手机 App"] --- RC["遥控器 RC (源=rc,80)"]
+        VR["VR (源=vr,70)"] --- INSTA["Insta360 (源=INSTA360)"]
+        PC["开发 PC 10.1.1.99（SDK 程序）"]
+        DOCK["回充桩/蓝牙音箱"]
+    end
+
+    subgraph SOC1["大脑板 10.1.1.101｜T1 Pro: Orin Nano 6核A78AE+40TOPS｜T1: RK平台"]
+        AG["agent（M1 对话智能体·归属待证）"]
+        TE["task_engine（M2·归属待证）"]
+        PNC["感知规划 pnc（M3·Pro 档功能）"]
+        VEN["供应商程序 abox 等"]
+    end
+
+    subgraph SOC0["运控板 10.1.1.100｜ARM SoC（型号未披露·资源极度有限）"]
+        MC["mc /mc_ros2_node（M6：状态机·仲裁·任务队列）"]
+        HALC["hal_camera（M7：JPEG/RTSP 2554）"]
+        HALA["hal_audio（M7/M5：音量·播放·8ch 录音）"]
+        INTX["交互基础服务（M5：TTS 调度·表情·灯效·触摸·舵机·BMS）"]
+        YAMO["yamo+sys_guard（M10：两阶段启动·cgroup）"]
+        PA["PulseAudio（6001/4713）"]
+        PM8["PrimeMotion 实时内核（M8·载体未公开）"]
+    end
+
+    subgraph MCU["板内嵌入式单元"]
+        JM["关节 MCU ×14（FOC·限位·看门狗）"]
+        BMSM["BMS MCU（29 位状态）"]
+        AUD["aw89403 声卡（6麦+2回采）"]
+        SRV["变形舵机/灯驱动/触摸IC/屏驱动"]
+    end
+
+    APP & VR -.WiFi/BT.-> SOC1
+    RC -.-> SOC0
+    PC & INSTA -.LAN FastDDS.-> SOC0
+    SOC1 <==|"板间以太网 FastDDS（带宽未披露）"| SOC0
+    MC --> PM8 --> JM
+    INTX --> SRV
+    HALA --- PA --- AUD
+    HALA & INTX & MC --- BMSM
+```
+
+#### 5.3.10 仍缺失/待实机验证清单
+
+1. 运控板 SoC 型号、核数、实时内核载体（Linux RT 还是板内 MCU）——需拆机或 SSH 后 `cat /proc/cpuinfo`/`lspci`；
+2. 板间链路物理带宽与实际有效吞吐；
+3. agent/task_engine/app_proxy/abox 的权威板卡归属（5.2.3 的分板 `yamo em doctor` 验证法）；
+4. 跨板时钟同步机制（PTP/chrony）；
+5. ToF×5/鱼眼×2/IMU 的接入板卡与数据通路（判断 Pro 档感知是否可被二开复用）；
+6. 大脑板是否预装 TensorRT/CUDA 推理栈及供应商程序清单。
+
+---
+
+## 六、整体系统架构推导
+
+### 6.1 架构总图
 
 ```mermaid
 flowchart TB
@@ -623,7 +934,7 @@ flowchart TB
 
 **一句话概括**：大脑板管"想"（Agent/感知/规划），运控板管"动"（MC 状态机+交互基础服务+实时内核），一块 FastDDS 局域网总线把两侧和开发者 PC 平等缝在一起；安全与实时闭环下沉在运控板与关节固件，开放面全部收敛为 ROS2 Topic/Service。
 
-### 5.2 架构特征分析（SDK 证据支撑）
+### 6.2 架构特征分析（SDK 证据支撑）
 
 1. **双板双域，职责官方明文**：运控板=HAL+MC+基础交互（重实时轻算力），大脑板=核心算法+感知+规划+供应商程序（重算力）——"小脑/大脑"物理分离。
 2. **频率金字塔可从接口频率反推**：关节 500–1000Hz（低层）→ 速度 50–100Hz → 上肢 100Hz → Action/Motion 事件级 → ASR/对话事件级——每层向上抽象一级（力矩→速度→技能→意图）。
@@ -636,7 +947,7 @@ flowchart TB
 
 ---
 
-## 六、关键技术抓手
+## 七、关键技术抓手
 
 | # | 抓手 | 内涵 | 证据强度 |
 |---|---|---|---|
@@ -647,7 +958,7 @@ flowchart TB
 | 5 | **纯视觉+ToF 感知与形态自适应** | 无激光雷达路线；相机外参随形态变化（左目倒置证据）；Pro 档以 NPU 算力解锁 360° 融合/VSLAM | 〔官方+产品〕 |
 | 6 | **端云一体的技能生态** | WorkBuddy 数万 Skill + PrimeStore/RPK 分发 + source=INSTA360 的第三方硬件联动枚举——机器人作为" Skill 执行体"的平台化打法 | 〔官方枚举+产品〕 |
 
-## 七、关键竞争力与短板
+## 八、关键竞争力与短板
 
 **竞争力**（按差异化强度排序）：
 
