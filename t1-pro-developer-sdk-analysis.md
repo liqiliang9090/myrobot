@@ -863,10 +863,10 @@ flowchart TB
     end
 
     subgraph SOC0["运控板 10.1.1.100｜ARM SoC（型号未披露·资源极度有限）"]
-        MC["mc /mc_ros2_node（M6：状态机·仲裁·任务队列）"]
+        MC["mc /mc_ros2_node（M6：状态机·输入源仲裁·任务队列）"]
         HALC["hal_camera（M7：JPEG/RTSP 2554）"]
         HALA["hal_audio（M7/M5：音量·播放·8ch 录音）"]
-        INTX["交互基础服务（M5：TTS 调度·表情·灯效·触摸·舵机·BMS）"]
+        INTX["交互基础服务（M5：TTS 权重仲裁·播报队列·表情·灯效·触摸·舵机·BMS）"]
         YAMO["yamo+sys_guard（M10：两阶段启动·cgroup）"]
         PA["PulseAudio（6001/4713）"]
         PM8["PrimeMotion 实时内核（M8·载体未公开）"]
@@ -880,7 +880,7 @@ flowchart TB
     end
 
     APP & VR -.->|"WiFi/BT"| SOC1
-    RC -.-> SOC0
+    RC -.->|"链路未披露（推测 2.4G 专用无线电）"| SOC0
     PC & INSTA -.->|"LAN FastDDS"| SOC0
     SOC1 <==>|"板间以太网 FastDDS（带宽未披露）"| SOC0
     MC --> PM8 --> JM
@@ -889,6 +889,8 @@ flowchart TB
     HALA & INTX & MC --- BMSM
 ```
 
+> **边标签口径说明**：①`RC → 运控板`——遥控器为内置输入源 `rc`（优先级 80、1000ms 脱锁、"工业级实体遥控器"〔官方〕），但其**无线电制式官方未披露**，图上"2.4G 专用无线电"为推测（行业惯例：独立于 WiFi 保低时延抗干扰；宇树 Go2 遥控器同款做法）；遥控器**不是 DDS 网络参与者**，`ros2 node list` 不可见。②`LAN FastDDS` 标签仅适用于开发者 PC / Insta360 这类**加入 10.1.1.0/24 局域网的 FastDDS 节点**，不适用于遥控器。③`WiFi/BT` 为 App/VR 接入大脑板侧的推测链路。④图中 MC 的"输入源仲裁+任务队列"与交互服务的"TTS 权重仲裁+播报队列"**对称构成双仲裁体系**（运动控制权 vs 发声通道权，机制对照详见 6.2 特征 4 / 6.3 抓手 3）。
+
 #### 5.3.10 仍缺失/待实机验证清单
 
 1. 运控板 SoC 型号、核数、实时内核载体（Linux RT 还是板内 MCU）——需拆机或 SSH 后 `cat /proc/cpuinfo`/`lspci`；
@@ -896,7 +898,8 @@ flowchart TB
 3. agent/task_engine/app_proxy/abox 的权威板卡归属（5.2.3 的分板 `yamo em doctor` 验证法）；
 4. 跨板时钟同步机制（PTP/chrony）；
 5. ToF×5/鱼眼×2/IMU 的接入板卡与数据通路（判断 Pro 档感知是否可被二开复用）；
-6. 大脑板是否预装 TensorRT/CUDA 推理栈及供应商程序清单。
+6. 大脑板是否预装 TensorRT/CUDA 推理栈及供应商程序清单；
+7. 遥控器 `rc` 的物理链路制式（2.4G 专用无线电 / BT / WiFi——实机看遥控器配对方式与运控板外设即可判定）。
 
 ---
 
