@@ -879,9 +879,9 @@ flowchart TB
         SRV["变形舵机/灯驱动/触摸IC/屏驱动"]
     end
 
-    APP & VR -.WiFi/BT.-> SOC1
+    APP & VR -.->|"WiFi/BT"| SOC1
     RC -.-> SOC0
-    PC & INSTA -.LAN FastDDS.-> SOC0
+    PC & INSTA -.->|"LAN FastDDS"| SOC0
     SOC1 <==|"板间以太网 FastDDS（带宽未披露）"| SOC0
     MC --> PM8 --> JM
     INTX --> SRV
