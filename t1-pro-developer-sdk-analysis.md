@@ -882,7 +882,7 @@ flowchart TB
     APP & VR -.->|"WiFi/BT"| SOC1
     RC -.-> SOC0
     PC & INSTA -.->|"LAN FastDDS"| SOC0
-    SOC1 <==|"板间以太网 FastDDS（带宽未披露）"| SOC0
+    SOC1 <==>|"板间以太网 FastDDS（带宽未披露）"| SOC0
     MC --> PM8 --> JM
     INTX --> SRV
     HALA --- PA --- AUD
