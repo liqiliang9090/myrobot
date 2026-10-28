@@ -486,6 +486,21 @@ sequenceDiagram
     AG->>IN: PlayEmotion(10 平静-1)+LedStripCommand(LED_ALL_OFF/白色呼吸)
 ```
 
+**时序步骤 × 官方接口对照表**（凡列出接口名的行均为官方真实接口，名称与参数和 §2.2 逐条对应；标"—（非 SDK 接口）"的行是板内/端内通道，官方未开放，列出仅为步骤完整性，不虚构接口）：
+
+| 时序步骤 | 接口（官方真实名称） | 接口简介 | 入参 | 出参 | 注意事项 |
+|---|---|---|---|---|---|
+| 1–3 拾音→唤醒→送识别 | —（非 SDK 接口，板内音频链路） | 物理声学与板内通道：8ch 48kHz（ch1–2 回采/ch3–8 麦克，ch5–6 主拾音）〔官方硬件事实〕；唤醒引擎未文档化〔推测〕 | — | — | 官方旁路参考：TCP 4713 可录到同源 8ch 音频（开发者旁路，非对话主链路） |
+| 4–5 识别结果回传 | `/aima/agent/asr_result`（Topic，AsrResult，Best Effort/D10） | ASR 结果流：中间结果+最终结果双阶段发布 | —（订阅只读） | 载荷：`header: MessageHeader`；`text: string`（识别文本）；`event_id: string`（对话上下文关联）；`is_final: bool`（false=中间/true=最终）；`confidence: float32 [0,1]`；`language: string`（如 zh） | ①Agent/开发者均为订阅方，SDK 无 ASR 注入接口（§4.7 缺口）；②以 event_id 关联同一轮对话；③建议按 confidence 过滤低置信结果 |
+| 6–7 意图理解 | —（非 SDK 接口，端云通道未文档化） | Agent↔云端 LLM/WorkBuddy〔产品口径+推测〕 | — | — | 断网时此环节退化（官方 TTS 说明"无网络无法播放未缓存新文本"间接印证云端参与） |
+| 8–10 应答播报 | `/aimdk_5Fmsgs/srv/PlayTts`（Service，Reliable） | 文本转语音合成并播报（异步调度；步骤 9 仲裁、10 扬声器输出为其服务端内部行为） | `header: CommonRequest`；`tts_req: PlayTtsRequest{text（建议 ≤100 字）、priority_level: TtsPriorityLevel{value}（本例 L6=6）、priority_weight: uint32(0–99)、domain: string（业务域审计）、trace_id: string、is_interrupted: bool（本例 true）}` | `header: CommonResponse`；`tts_resp: PlayTtsResponse{text、priority_level、priority_weight、domain、trace_id、is_success: bool（入队成功否）、error_message: string、estimated_duration: uint32（流式合成固定 0）}` | ①最终权重=主级×100+子权；权重不足且不可抢占→请求丢弃（is_success=false）；②is_success=true 仅代表入队，非播完；③无播报完成事件，按 ~200ms/字估时（本例 6 字≈1.2s） |
+| 11、25 表情 | `/aimdk_5Fmsgs/srv/PlayEmotion`（Service，Reliable） | 播放内置表情或 mp4 视频（本例 [19 非常喜悦]；收尾 [10 平静-1]） | `header: CommonRequest`；`type: string`（必填 "emotion"/"file"）；`emotion_ids: int32[]`；`file_paths: string[]`（仅 mp4、绝对路径）；`priority: int32`（高打断低）；`loop_count: int32`（≤0 无限循环） | `header: CommonResponse` | ①type 空或非法直接 FAILURE；②表情仅内置 23 种、不可自定义；③步骤 25 的表情+灯效是两次独立服务调用（图中合并画出） |
+| 12、25 灯效 | `/aimdk_5Fmsgs/srv/LedStripCommand`（Service，Reliable） | 灯带效果控制（本例 3=LED_DANCING 律动；收尾 0=全灭或 20=白色呼吸） | `request: CommonRequest`；`led_strip_mode: uint8`（0–20 预定义+254/255 自定义）；`r/g/b: uint8`（自定义模式生效）；`period: uint16`（ms，0=常亮） | `header: CommonResponse` | ①非法 mode 值被**静默忽略**（无错误回执）；②预定义模式下 r/g/b/period 被忽略 |
+| 13–15 动作下发 | `/aimdk_5Fmsgs/srv/SetMcAction`（Service，Reliable） | 按状态机合法路径切换运动模式（本例 QUADRUPED_LOCOMOTION_DANCE=109；步骤 14 校验/入队为 MC 内部机制，对外表现为错误码） | `header: RequestHeader{stamp}`；`source: string`（本例 "agent"，语义见 McTaskSource 枚举）；`command: McActionCommand{action: McAction{value:109}、action_desc: string}`（数值优先、字符串按配置名回退） | `response: CommonTaskResponse{header{stamp,code}、task_id: uint64、state: CommonState{value,reason}}`（本例 value=200 PENDING） | ①必须走合法拓扑（站立→技能合法；越级拦截 -1001～-1006）；②两次指令 ≥500ms（-10001）；③source 为空返回 -10002；④task_id 现无查询接口，仅日志对账（§4.7 缺口 5） |
+| 16–19 实时执行 | —（非 SDK 接口，板内实时闭环） | MC→PrimeMotion→14 关节的目标流与伺服闭环，SDK 明确不开放 | — | — | 官方低层旁路 `/aima/hal/joint/command`（500–1000Hz）与本链路**互斥**：须 Advanced+低层域+关闭高层运控；本 case 高层在跑故不可用 |
+| 20–21、23–24 状态轮询 | `/aimdk_5Fmsgs/srv/GetMcAction`（Service，Reliable） | 查询当前动作生命周期阶段——启动门控（等 TRANSITION→RUNNING）与完成探测（等 current_action 回 101）共用此接口 | `request: CommonRequest{header: RequestHeader{stamp}}`（**无 task_id**） | `header: ResponseHeader{stamp,code}`；`info: McActionInfo{current_action: McAction{value}、source: string、action_desc: string、status: McActionStatus{value: IDLE=0/RUNNING=100/TRANSITION=200}、switch_ready: bool}` | ①status 遵循 McActionStatus 协议（100=RUNNING），勿与 CommonState（400=RUNNING）混淆；②current_action.value=0 不一定空闲，用 action_desc 兜底；③切换过渡可达数秒需高频探测，完成探测跨动作全程（10–30s） |
+| 22 状态回流 | `/aima/hal/joint/state`（Topic，JointStateArray，Best Effort/D10，500Hz） | 全身关节状态回流（监控/记忆用，不进控制环；发布者为 HAL，图中 J→MC 为简化画法） | —（订阅只读） | 载荷：`header: MessageHeader`；`joints: JointState[]{name、position(rad)、velocity(rad/s)、effort(N·m)、coil_temp(℃)、motor_temp(℃)、motor_vol(V)}` | ①二开模式下实际频率低于 1000Hz，勿作同步前提；②解析必须按 name 匹配（防列表乱序）；③全量 14 关节每帧完整上报 |
+
 ### 4.3 分阶段分解（数据实例）
 
 **A. 拾音与唤醒**（M7-hal_audio → M5 音频前端）
