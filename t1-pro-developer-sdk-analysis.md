@@ -477,9 +477,10 @@ sequenceDiagram
         AG->>MC: GetMcAction
         MC-->>AG: status: TRANSITION(200)→RUNNING(100)
     end
-    J-->>MC: /aima/hal/joint/state (500Hz 全量)
+    J-->>MC: /aima/hal/joint/state (500Hz 全量，经 HAL 发布)
     Note over MC,PM: 舞毕：技能类过渡态自动回 QUADRUPED_STAND/LOCOMOTION〔官方〕
-    MC-->>AG: GetMcAction → 回到基础态
+    AG->>MC: GetMcAction（完成探测轮询）
+    MC-->>AG: current_action=101 四足站立（回到基础态＝完成信号）
     AG->>IN: PlayEmotion(10 平静-1)+LedStripCommand(LED_ALL_OFF/白色呼吸)
 ```
 
@@ -587,7 +588,7 @@ sequenceDiagram
 2. **形态感知的权威来源**：SetServo 的 0–90° 是变形舵机角度，GetMcAction 是逻辑形态；双目左目画面随形态倒置说明相机外参与形态强相关——形态应是一等系统状态（影响感知标定/动作合法性/状态估计）〔官方证据综合〕。
 3. **QoS 与带宽治理**：运控板资源"极度有限"〔官方原话〕；高频大包（joint/state 500Hz、RTSP）与控制流共享 20M UDP 缓冲的隔离策略（SHM 默认关闭）值得压测。
 4. **时间同步**：header.stamp 单调性由总线驱动强制〔官方〕，但跨板（大脑/运控）时钟源与 meas_stamp 语义未文档化——多传感融合与日志对账的前提。
-5. **已知接口缺口清单**〔官方技能 README 自述+本文核验〕：无 SLAM/导航接口、无夹爪、无 ASR 开放输入接口（只读结果不能注入）、无力传感接口、无双目深度/ToF 数据接口（仅 RGB JPEG/RTSP）、TTS 无播报完成事件、SetMcInputSource 不持久化、SetMcMotion 外部 model/resource 字段未实现——这些缺口恰是 T1 Pro 后续版本与竞品对比的观察点。
+5. **已知接口缺口清单**〔官方技能 README 自述+本文核验〕：无 SLAM/导航接口、无夹爪、无 ASR 开放输入接口（只读结果不能注入）、无力传感接口、无双目深度/ToF 数据接口（仅 RGB JPEG/RTSP）、TTS 无播报完成事件、**task_id 无查询接口**（官方要求"保存 task_id 去异步监听排队进度"，但全 SDK 无任何接口接受它——GetMcAction 只查全局当前态；因动作状态机同一时刻仅一个活动 Action，实操按动作身份+status 轮询即可，task_id 仅用于日志对账〔本文核验〕）、SetMcInputSource 不持久化、SetMcMotion 外部 model/resource 字段未实现——这些缺口恰是 T1 Pro 后续版本与竞品对比的观察点。
 6. **多机与隔离**：ROS_DOMAIN_ID 区分多台机器人〔官方〕，但 DDS 无认证（同网段即入网）——开发者模式下局域网安全模型值得评估（对照宇树 CVE 教训）。
 
 ---
