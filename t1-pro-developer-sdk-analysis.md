@@ -479,8 +479,10 @@ sequenceDiagram
     end
     J-->>MC: /aima/hal/joint/state (500Hz 全量，经 HAL 发布)
     Note over MC,PM: 舞毕：技能类过渡态自动回 QUADRUPED_STAND/LOCOMOTION〔官方〕
-    AG->>MC: GetMcAction（完成探测轮询）
-    MC-->>AG: current_action=101 四足站立（回到基础态＝完成信号）
+    loop 完成探测（舞毕判定轮询，直至回到基础态）
+        AG->>MC: GetMcAction
+        MC-->>AG: current_action=101 四足站立（回到基础态＝完成信号）
+    end
     AG->>IN: PlayEmotion(10 平静-1)+LedStripCommand(LED_ALL_OFF/白色呼吸)
 ```
 
