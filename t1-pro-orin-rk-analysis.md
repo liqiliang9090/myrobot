@@ -789,3 +789,215 @@ AimRT 的 protobuf RPC 经 ROS 2 桥暴露，**服务名是转义后的 proto �
 
 - 本文是 `t1-pro-developer-sdk-analysis.md`（推导口径）的**实机校验版**：§5.2/§5.3 的进程部署推导与实测一致（Agent/task_engine 在 rk=运控板侧、感知 nav2 在 orin=大脑板侧——注意官方「大脑板」指 orin，但**业务大脑 Agent 实际跑在 rk**，与推导文档 M1 标注的「大脑板进程 agent」需修正为 rk）。
 - SDK 官方 30 接口（★）与《接口说明.md》§1 全部在实机图上得到印证，另发现官方未文档化的内部接口 ~370 个。
+
+---
+
+## 6. 整体系统架构图与软件模块接口关系图
+
+> 本章依据：① 本文 §1–§5 实机采集（**冲突时以此为准**）；② SDK《README.md》《PrimeBot_SDK快速入门与集成指南.md》§1 系统架构总览与 §4 板载自启动接入；《接口说明.md》§1。
+> 与官方文档的两处口径差异（以实测为准）：官方示例节点名 `/hal_audio` 实测为 `/audiomanager_ros2_node`；官方图未标注的**业务大脑（Agent/task_engine/sm）实际部署在运控板 rk**，「大脑板 orin」承载的是感知与导航算法。
+
+### 6.1 整体系统架构图（三层五域）
+
+```mermaid
+flowchart TB
+    subgraph CLOUD["☁ 外部生态域"]
+        CLOUDP["云端平台<br/>aiem-gw.primebot.cn"]
+        APP["手机 App"]
+        RCDEV["体感遥控器"]
+        QJDEV["圈圈 UWB 随行器"]
+        I360DEV["Insta360 云台相机"]
+        SDKUSER["SDK 用户程序<br/>(开发 PC 10.1.1.99 / 板载)"]
+    end
+
+    subgraph RK["🖥 运控板 rk3576（soc0 · 10.1.1.100 · 8核: 4×A72+4×A53）"]
+        direction TB
+        subgraph RK1["业务中枢层（普通核）"]
+            AGENT["Agent 对话智能体<br/>aima-agent-app"]
+            TE["Task Engine 任务引擎"]
+            SM["SM 状态机"]
+            HDS["HDS 健康诊断"]
+            OTA["OTA / Cloud / 数据导出"]
+            HK["Housekeeper 管家<br/>+ AppProxy + 资源/场景/设备管理"]
+        end
+        subgraph RK2["基础服务层（普通核）"]
+            AUDIO["音频管理<br/>(PulseAudio 6001/4713)"]
+            RTSP["RTSP 视频流"]
+            ODOM["足式里程计"]
+            UI["胸屏 Flutter UI"]
+            HALS0["传感器 HAL soc0<br/>(BMS/触摸/灯/舵机)"]
+        end
+        subgraph RK3["实时运控层（隔离核）"]
+            MC["运动控制 mc_app_main<br/>⬛ CPU3 独占·36线程"]
+            IRQ["CAN0/CAN1 硬中断<br/>⬛ CPU2 独占"]
+        end
+    end
+
+    subgraph ORIN["🧠 大脑板 Jetson Orin Nano Super（soc1 · 10.1.1.101 · 6×A78AE + Ampere GPU）"]
+        direction TB
+        subgraph OR1["感知层"]
+            HALRG["RGBD/ToF HAL（5 目 ToF）"]
+            HALC["相机 HAL（双目/鱼眼/彩色+IMU）"]
+            PTRACK["人体跟踪"]
+            FUS["多传感器融合 coreon_fusion"]
+            PERCEP["感知算法 percep<br/>(分割/环境/楼梯/语义代价图)"]
+        end
+        subgraph OR2["导航与运动规划层"]
+            NAV2["Nav2 导航栈<br/>(bt/planner/controller/costmap)"]
+            FOLLOW["跟随控制 follow"]
+            TRAJ["轨迹跟踪 trajectory_tracker"]
+        end
+        HALS1["传感器 HAL soc1<br/>(ADU 电源板/温度)"]
+    end
+
+    subgraph HW["⚙ 执行与本体硬件域"]
+        JOINTS["14× 关节执行器 + 主控 MCU"]
+        SENSORS["本体传感器<br/>(BMS/ADU/触摸/IMU/ToF)"]
+    end
+
+    APP <-- "WiFi/热点(p2p0 192.168.88.x)<br/>TRRO 透传 + ConnectRobot 鉴权" --> HK
+    CLOUDP <-- "MQTT/TLS + 云端 RPC<br/>(属性上报/OTA/上传)" --> OTA
+    RCDEV --蓝牙/私有协议--> RK2
+    QJDEV --"BLE + UWB 测距"--> HK
+    I360DEV --WiFi--> RK2
+    SDKUSER <-- "FastDDS（ROS2 域0）<br/>★官方 30 接口面" --> RK
+    SDKUSER <-- "FastDDS（ROS2 域0）" --> ORIN
+
+    RK <-- "内部以太网 10.1.1.0/24<br/>FastDDS 域0 · PTP 时钟同步<br/>(相机原图/点云↓ 状态/指令↑)" --> ORIN
+
+    MC --"CAN0/CAN1 总线（1kHz 级）"--> IRQ --> JOINTS
+    SENSORS --I2C/SPI/UART--> HALS0
+    SENSORS --MIPI/USB--> HALRG & HALC
+    HALS1 --串口--> SENSORS
+```
+
+读图要点：
+- **三块计算单元一个 ROS 2 域**：开发 PC、rk、orin 同处 10.1.1.0/24，FastDDS 域 0 直连——这是「SDK 用户程序可部署在 PC/运控板/大脑板任意位置、透明访问全部接口」的物理基础（官方《快速入门》§1 口径，实测印证）。
+- **rk 内三明治结构**：业务中枢层（Agent/任务引擎/状态机）→ 基础服务层 → 实时运控层（隔离核），越往下实时性越强。
+- **orin 是感知/导航算法舱**：5 目 ToF + 多路相机的原始数据在板内以 iceoryx 零拷贝流转，仅结果级数据（状态/点云/目标）进 DDS 域。
+- **板载模块扩展位**：自定义模块放 `/robot/software/<your_module>/`，在 `process_manager` 的 `t1_*_socx_config.yaml` 注册即可开机自启（官方《快速入门》§4，与实测 em 部署链一致）。
+
+### 6.2 软件模块清单（与 6.1 图框一一对应）
+
+| 域（6.1 图框） | 模块 | 板/进程（实证） | ROS 2 节点 | 职责 | 代表性接口（详见 §5） |
+|---|---|---|---|---|---|
+| 外部 | 手机 App ↔ app_proxy | rk · local_app_proxy | `/app_proxy`(`/app_proxy_client`) | App 接入鉴权、状态镜像、指令转发 | `ConnectRobot`/`JsonWebCheck`、TRRO 双向话题 |
+| 外部 | 云端 ↔ cloud_proxy/ota_master/data_exporter | rk | `/cloud_proxy`/`/ota_master`/`/data_exporter` | 云协同、OTA、数据上传 | proto 属性 RPC、`soc0/cloud/*` |
+| 外部 | SDK 用户程序 | PC/rk/orin | 用户自定义 | 二次开发（官方 30 接口面） | `SetMcAction`、`/aima/mc/locomotion/velocity` 等 ★ |
+| rk·业务中枢 | Agent | rk · aima-agent-app | `/aimrt_agent_node` | 语音对话/LLM/交互决策 | `PlayTts`、`asr_result`、`semantic_intent` |
+| rk·业务中枢 | Task Engine | rk · task_engine | `/task_engine` | 长任务编排与仲裁中枢（P12/S39/V30/C51） | `AmRequest`、`PlayMove`、`NaviTaskCtrl` |
+| rk·业务中枢 | SM | rk · aim_sm_app | `/sm` | 整机状态机、应用编排 | `GetSystemState`、`SmNodeService/*` proto |
+| rk·业务中枢 | HDS | rk · aima-hds-app | `/hds` | 健康诊断/告警码 | `GetAlertCodeJsonFile`、`alert_code_list` |
+| rk·业务中枢 | Housekeeper 等 | rk · housekeeper/picture_service/scene_engine/device_manager | `/housekeeper0` 等 | 网络/蓝牙/资源/场景/设备管理 | `CtrlWifi`、`GetPictureList`、`SceneCommand` |
+| rk·基础服务 | 音频管理 | rk · aimrt_main(audio_manager) | `/audiomanager_ros2_node` | 采音/播放/音乐/在线音乐 | `PlayAudioFile`、TCP 6001/4713 |
+| rk·基础服务 | 传感器 HAL soc0 | rk · aimrt_main(hal_sensor) | `/hal_sensor_soc0` | BMS/触摸/灯带/颈部灯/舵机/上下电 | `bms/state`、`LedStripCommand`、`SetServo` |
+| rk·基础服务 | 足式里程计 | rk · aima-legged_odom-app | `/legged_odom_node` | odom/tf/躯干位姿 | `/odom`、`/tf` |
+| rk·基础服务 | RTSP/胸屏 UI/圈圈/Insta360 | rk | `/rtsp_video_server` 等 | 视频流、UI 渲染、配件接入 | RTSP `live_<id>`、`quanji/*`、`insta360/*` |
+| rk·实时运控 | **MC 运动控制** | rk · **mc_app_main（CPU3）** | `/mc_ros2_node` | 实时运控内核（动作/步态/关节） | `SetMcAction`、`velocity`、`joint/command` |
+| orin·感知 | ToF/相机 HAL | orin · hal_rgbd、hal_camera | `/hal_rgbd_node`、`/hal_camera*` | 5 目 ToF + 相机接入/同步/出流 | `CaptureJpegImage`、`SetHalTofStream` |
+| orin·感知 | 人体跟踪/亮度 | orin · aimrt_main×2 | `/aimrt_person_track_*`、`/aimrt_brightness_*` | 跟随目标检测、亮度门控 | `follow_candidates` |
+| orin·感知 | 多源融合 | orin · coreon_fusion | `/coreon_fusion_ros2_node` | 27 路输入融合成目标/点云/避障 | `ObstacleCheck`、`target_info` |
+| orin·感知 | 感知算法 | orin · percep | `/perception` | 分割/室内外/楼梯/语义代价图 | `percep/local_costmap` |
+| orin·导航 | Nav2 栈 | orin · ros2 launch | `/robot_navigation` 等 12 节点 | 建图定位导航执行 | `/navi/command`★、`navi/state`★ |
+| orin·导航 | 跟随/轨迹跟踪 | orin · follow、trajectory_tracker | `/follow_node`、`/trajectory_tracker` | 跟随控制、环绕运镜 | `follow/state`★、`SpawnIntelligentMotionTask`★ |
+| 硬件 | 关节执行器/MCU | CAN0/CAN1（CPU2 收中断） | — | 14 关节伺服 | CAN 1kHz 级（不暴露 DDS） |
+| 双板公共 | process_manager/sys_guard/iox-roudi/data_exporter/ota_slave | 双板 | `/process_manager0/1` 等 | 进程守护/看护/零拷贝总线/导出/升级 | `EmAppService` proto、iceoryx |
+
+### 6.3 软件模块接口关系图（6.1 的模块级展开）
+
+> 连线标注 = 实际承载接口（topic/service 名或总线类型）；箭头方向 = 数据/调用方向。模块框与 6.1 的域/层框一一对应。
+
+```mermaid
+flowchart LR
+    %% ===== 外部 =====
+    APP(["手机 App"])
+    SDK(["SDK 用户程序<br/>(PC/rk/orin)"])
+
+    subgraph RK["rk 运控板 soc0"]
+        direction TB
+        subgraph RK1["业务中枢层"]
+            AGENT["Agent"]
+            TE["Task Engine<br/>(服务端: AmRequest 仲裁·<br/>PlayMove/PlayAnimation/MapCommand…)"]
+            SM["SM 状态机"]
+            HK["Housekeeper/<br/>AppProxy"]
+        end
+        subgraph RK2["基础服务层"]
+            AUDIO["音频管理"]
+            HALS0["传感器HAL soc0"]
+            ODOM["足式里程计"]
+            QJ["圈圈接入"]
+        end
+        MC["MC 运动控制<br/>(CPU3)"]
+    end
+
+    subgraph ORIN["orin 大脑板 soc1"]
+        direction TB
+        subgraph OR1["感知层"]
+            HALR["ToF/相机 HAL"]
+            FUS["融合 coreon_fusion"]
+            PTR["人体跟踪"]
+            PRC["感知 percep"]
+        end
+        subgraph OR2["导航规划层"]
+            NAV2["Nav2"]
+            FLW["follow"]
+            TRJ["trajectory_tracker"]
+        end
+    end
+
+    JOINT(["14× 关节执行器<br/>(CAN0/1 @ CPU2)"])
+
+    %% ===== App / SDK =====
+    APP -->|"ConnectRobot / JsonWebCheck<br/>TRRO push/pull"| HK
+    SDK ==>|"★ SetMcAction / PlayTts / NaviTaskCtrl…<br/>★ velocity / joint/command 话题"| TE
+    SDK ==>|"★ CaptureJpegImage / bms/state…"| HALR
+
+    %% ===== rk 内部 =====
+    HK -->|"CtrlWifi 等系统服务<br/>network_state 话题"| TE
+    AGENT -->|"asr_result / semantic_intent 话题"| TE
+    TE -->|"SetMcAction/SetMcMotion 服务"| MC
+    TE -->|"velocity 话题(source=interaction)"| MC
+    SM -->|"SmNodeService/* proto<br/>(ExecuteAction/Fallback)"| TE
+    SM -.->|"EmAppService proto<br/>StartApp/StopApp"| RKPM["process_manager"]
+    TE -->|"PlayTts 服务"| AGENT
+    AGENT <-->|"play_state / tts_status 话题"| AUDIO
+    TE -->|"PlayAudioFile / ControlMusic 服务"| AUDIO
+    TE -->|"LedStripCommand / SetServo / TouchEnable"| HALS0
+    HALS0 -->|"bms/touch/servo 状态话题"| TE
+    MC -->|"mc/common/state 话题"| ODOM & TE
+    ODOM -->|"/odom · /tf 话题"| TE
+    QJ -->|"quanji/uwb·radar 话题"| TE
+
+    %% ===== 跨板 rk<->orin（10.1.1.0/24 FastDDS）=====
+    HALR ==>|"ToF 点云/相机图（iceoryx板内→DDS跨板）"| FUS
+    PTR -->|"target_info / follow_candidates"| FLW & TRJ
+    FUS -->|"fused_obstacle_cloud / percep_fusion"| PRC
+    PRC -->|"percep/local_costmap（语义代价图）"| NAV2
+    NAV2 -->|"navi/state 话题 ★"| TE
+    TE -->|"/navi/command 服务 ★"| NAV2
+    NAV2 -->|"velocity 话题(source=pnc)"| MC
+    FLW -->|"follow/state ★ + velocity"| TE & MC
+    TRJ -->|"intelligent_task_state ★"| TE
+
+    %% ===== 执行 =====
+    MC -->|"关节指令 CAN 1kHz"| JOINT
+```
+
+### 6.4 两张图的对应关系与校验说明
+
+| 6.1 架构图中的框 | 6.3 模块图中的展开 | 承载接口类型 |
+|---|---|---|
+| 外部生态域：手机 App | APP → Housekeeper/AppProxy | ROS 2 service（鉴权）+ TRRO 二进制话题 |
+| 外部生态域：SDK 用户程序 | SDK ⇒（双线箭头） | ★官方 30 接口（§5 表中标★行） |
+| rk 业务中枢层 | Agent/Task Engine/SM/Housekeeper 组 | service 调用 + 状态话题 + SmNode/EmApp proto |
+| rk 基础服务层 | 音频/HAL soc0/里程计/圈圈 组 | service + 状态话题 + TCP（音频 6001/4713） |
+| rk 实时运控层 | MC（CPU3）→ 关节（CPU2 中断） | 仲裁后 velocity/joint 指令 → CAN（不出板） |
+| orin 感知层 | HAL→融合→感知 链 | 板内 iceoryx 零拷贝 + 跨板 DDS 点云/目标 |
+| orin 导航规划层 | Nav2/follow/trajectory_tracker | nav2 标准 + `/navi/*` 封装服务 + velocity |
+| 执行与本体硬件域 | JOINT 执行器框 | CAN 总线（对 DDS 域不可见） |
+
+**一致性校验**（对照本文 §4/§5 实测）：
+1. 图中每条连线均对应 §4.x 节点挂载表里实际存在的 pub/sub 或 service 关系（如 Task Engine 的 51 路服务客户端、SM 的 28 路 proto 客户端）。
+2. `velocity` 话题 11 个发布者（task_engine/app_proxy/rc/agent 侧/nav2/follow/轨迹跟踪/Insta360…）与图中「多源 → MC」的汇聚关系一致；MC 侧按 `SetMcInputSource` 优先级仲裁。
+3. 感知层内部大数据（5 目 ToF 原始点云、相机原图）优先走板内 iceoryx（`/opt/iceoryx` + roudi），仅融合结果与 `sensor_info` 上 DDS——对应 6.1 图中「结果级数据进 DDS 域」的注释，也与 rk 侧 CLI 观察不到 orin 全部本地节点的现象（§4.0）互证。
+4. 官方文档与实机的三处差异已在图上修正：Agent/task_engine 位置（rk 而非 orin）、音频节点实名、HAL 层拆分为 soc0/soc1 双实例。
