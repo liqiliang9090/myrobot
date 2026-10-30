@@ -1,0 +1,8 @@
+14:24:45.088 1 baseline_start
+14:27:53.714 1R baseline_restart
+14:29:35.904 2 UC1_dance_start
+14:31:36.019 3 UC1_end_UC2a_lie_start
+14:33:35.050 4 UC2a_end_UC2b_stand_start
+14:34:54.297 5 UC2b_end_UC3_follow_start
+14:40:20.275 6 UC3_end_all_stop
+14:40:59.205 END sampling_stopped

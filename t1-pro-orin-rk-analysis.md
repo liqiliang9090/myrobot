@@ -1071,3 +1071,442 @@ flowchart LR
 
 - 本文是 `t1-pro-developer-sdk-analysis.md`（推导口径）的**实机校验版**：§5.2/§5.3 的进程部署推导与实测一致（Agent/task_engine 在 rk=运控板侧、感知 nav2 在 orin=大脑板侧——注意官方「大脑板」指 orin，但**业务大脑 Agent 实际跑在 rk**，与推导文档 M1 标注的「大脑板进程 agent」需修正为 rk）。
 - SDK 官方 30 接口（★）与《接口说明.md》§1 全部在实机图上得到印证，另发现官方未文档化的内部接口 ~370 个。
+
+---
+
+## 附录 C. 软件栈 · usecase 链路 · 运行资源 · 启动与部署（2026-10-30 实机深挖）
+
+> **采集方式**：本章数据来自 2026-10-30 对两板的新一轮**只读**探测（`dpkg-query -W`/`pip3 list`/`ldd`/`strings`/`find -printf`/`systemctl cat`/`du`/`/proc/*/environ`/`/sys/fs/cgroup`）+ 一轮**人工交互式动态采样**（用户现场语音触发三个场景，采样器全程连续记录：两板 `top -b -d 3` 全进程快照、orin `tegrastats` 2Hz、rk devfreq(Mali GPU)/debugfs(rknpu NPU) 3s 周期、ROS 2 事件流 `ros2 topic echo` 毫秒级时间戳对齐场景边界）。除只读订阅外无任何写入、无服务调用。原始数据存档于 `appendix-c-data/`（c2_* 为正式采样轮）。
+> **版本基线**：与附录 A 相同固件 `qy2501_2_v2d2` soc0/soc1 `v1.0.0.5-R-202610050335`；全部 em 应用为 `release-v1.2.1.patch1004` 分支（2026-10-04/05 构建，每应用 `pipeline.json` 记录 commit），基础层 aimrte `v0.9.1-rc5.10`。
+
+### C.1 两板使用的工具、软件包与 AI 模型清单
+
+#### C.1.1 固件与系统级软件栈（两板对照，版本全部实测）
+
+| 组件 | rk（soc0，运控板） | orin（soc1，大脑板） | 开源仓 / 来源 |
+|---|---|---|---|
+| OS / 内核 | Ubuntu 22.04.5，`6.1.141-rk3576` | Ubuntu 22.04.5，`5.15.148-tegra`（L4T **R36.4.4** ≈ JetPack 6.2，GPU 驱动 540.4.0） | Ubuntu / NVIDIA |
+| ROS 2 | Humble `ros-base 0.10.0`（厂商 2026-03 重建包）、`rmw-fastrtps-cpp 6.2.10` | 同左 | ros2 / ros-infrastructure |
+| DDS | eProsima **Fast DDS 2.6.12**（`ros-humble-fastrtps`） | 同左 | eProsima/Fast-DDS |
+| 板内零拷贝 IPC | **iceoryx 2.95.4.2** + ros-humble-iceoryx-{hoofs,posh,binding-c} 2.0.5 | 同左 | eclipse-iceoryx/iceoryx |
+| 运行时框架 | **AimRT**（开源）+ 内部增强层 **aimrte v0.9.1-rc5.10** + `aimrt_py 1.2.0`；每个应用自带 `aimrt_main` 启动器 / `aimrte` / `iox-roudi` / `*_pb_ts.so` 插件 | 同左 | github.com/AimRT/AimRT（智元开源）；aimrte 未开源 |
+| 进程管理 | em/process_manager（自研，`em.service` 拉起） | 同左（soc1 实例） | 近亲开源：github.com/Link-U-OS/aimrt_process_manager（灵渠OS 组件） |
+| AI 推理栈 | **onnxruntime 1.19.2**（mc/agent）、**RKNN Runtime 2.3.2**（NPU，`librknnrt.so` 429f97ae 2025-04-09 构建）、**MNN ≈3.5.0**（AEC，strings 提取）、**sherpa-onnx 1.12.15**（KWS） | **CUDA 12.6.x**（cudart/nvrtc 12.6.68）、**TensorRT 10.7.0.23**（+python3-libnvinfer）、**cuDNN 9.3.0.75**、cuBLAS 12.6.1.4、jetson-stats 7.2.1 | microsoft/onnxruntime、airockchip/rknn-toolkit2、alibaba/MNN、k2-fsa/sherpa-onnx、NVIDIA |
+| OpenCV | 4.5.4（系统 dpkg）+ 4.8.1（agent 自带 `libopencv_*.so.408`） | 4.8.0（NVIDIA Jetson 版 `libopencv 4.8.0-1-g6371ee1`）+ 4.5.4（系统） | opencv/opencv |
+| 多媒体 | librockchip-**mpp 1.5.0**、lib**rga 2.2.0**、GStreamer 1.22.9 + rockchip 插件 1.14、ffmpeg 4.4.2（系统）/ 6.0（agent 自带 libavcodec.so.60） | （解码走 NVDEC/VIC） | Rockchip（部分开源）、GStreamer、FFmpeg |
+| 胸屏 UI | **flutter-pi**（自编译）+ Flutter `display_ui` bundle | — | github.com/ardera/flutter-pi |
+| 音频服务 | **PipeWire 1.6.8** + pipewire-pulse + wireplumber（SDK 所述 PulseAudio TCP 6001/4713 即其兼容口） | — | PipeWire（开源） |
+| 网络 / 时钟 | NetworkManager、hostapd/dnsmasq（p2p0 热点）、mosquitto 2.0.11（conduit_router TLS 实例）、linuxptp 3.1.1（ptp4l）、chrony 4.2、can-utils 2020.11.0 | NetworkManager、ptp4l、sync_time | 均开源 |
+| 其他库 | Qt 5.15.3（依赖库） | numpy 1.21.5、python3-opencv 4.5.4 | — |
+| 自研 / 商业（无公开仓） | tetherd（内网守护）、abox 日志、scene_engine、**connx（圈圈接入）**、secret_store、tc-engine、rtc_engine（TRRO 透传）、**omnis_sdk 4.0.0**（qiyuan-main-rc01，语音前端）、**科大讯飞 SDK**（libxf_vtn 唤醒 / evad / miniESR 5.1 / 听写 tingxie 2.0.16.6）、deepseek-harness-sdk 0.1.1rc1 | — | 启元/智元内部、讯飞商业授权 |
+
+#### C.1.2 AI 模型清单（文件实测，含大小 / 推理框架 / 用途 / 同款开源）
+
+**rk 板（8 个神经网络 + 云端 LLM）：**
+
+| 模型（实测文件） | 大小 | 模块 | 推理框架（实测） | 用途 | 同款开源 / 来源 |
+|---|---|---|---|---|---|
+| `rl_models/*.onnx` 共 **643 个**（激活目录 `qd1_t2d0` 264MB；6 套机型目录合计 ~1.0GB） | 2~23MB/个 | mc_app_main（CPU3 独占核） | **onnxruntime 1.19.2 @ CPU**（A53，实时环内推理） | RL 运动策略：`zoo_3500`/`q1_random_ground v2.0–v2.4`（地形步态）、`douyin_3500`（抖音舞）、`bi_dance_liuxingwu/haicao/meixi/qiumi/cluo`（双足舞曲）、`q1_danceGo`、`q1_ladingwu2`（拉丁舞）、`q1_run_jump` 等 | 自研 RL 训练产出（部署为 ONNX；训练框架未公开） |
+| `omnis_sdk/…/silero_vad.onnx` | 2.3MB | Agent 语音前端 | onnxruntime @ CPU | 语音活动检测（VAD） | **开源同款** snakers4/silero-vad |
+| `omnis_sdk/aec_models/dtln_aec_128_{1,2}.mnn` | 2.0/6.4MB | Agent | **MNN** @ CPU | 回声消除（DTLN 架构） | DTLN 公开架构、自训权重 |
+| `sherpa-onnx-kws`（tokens/keywords 资源） | — | Agent | **sherpa-onnx** | 关键词唤醒（KWS） | **开源** k2-fsa/sherpa-onnx |
+| 讯飞 `vtn/miniesr_5.1`、`evad.jet` | ~86MB | Agent third_party/iflytek_sdk | 讯飞私有引擎（libxf_vtn/libevad） | 唤醒 + 嵌入式识别 + 音频增强 | 商业 SDK（科大讯飞，appid 15d2493c） |
+| `t1/perception/models/`：`face_detect.bin` 30MB、`face_encode.bin` 80MB、`gesture_cls.bin` 64MB、`hand_detector.bin` 2.2MB、`pose.bin` 7.4MB、`reid.bin` 4.6MB | 合计 ~190MB | Agent（libface_id 0.5.0 / libperception_sdk 0.5.0） | **RKNN @ rk3576 NPU**（librknnrt 2.3.2，双核 6TOPS） | 人脸检测 / 人脸识别（声纹+人脸档案）/ 手势分类 / 手部检测 / 人体姿态 / 行人 ReID | 自研、未公开（RKNN 部署格式） |
+| `res/{bi,quad}_mimic_motion/*.csv`（如 `T1_bi_dance_two_three.csv`） | 数百 KB/个 | mc | 轨迹回放（非神经网络） | 模仿舞 / 示教动作库（`BIPED_MIMIC_DANCE_*`） | 自录 |
+| 云端 LLM（无本地权重） | — | Agent（`llm.config`） | 云 API：`aiem-gw.agibot.com:443 /v1/session`（多模态 2048×1536 图像上传、opus 音频回传、`local_wakeup: true`） | 对话 / 意图 / VLM 问候（`enable_vlm_greeting_*`） | 启元云端；备选配置在案：火山方舟 `bot-20241125134226-8972b`（nlu `ep-20241118154845`、fc `ep-20240611061540`）、Azure OpenAI gpt-4o-mini |
+
+**orin 板（24 个 TensorRT FP16 `.engine`）：**
+
+| 模型（实测文件） | 大小 | 模块 | 推理框架 | 用途 | 同款开源 / 来源 |
+|---|---|---|---|---|---|
+| `perception/models/Stereo_v2.2.0.0.engine` | 35MB | percep | TensorRT 10.7 @ GPU | 双目深度估计 | 自研 |
+| `perception/models/Segment_v0.5.12.0.engine` / `Segment_Qv0.2.1.0.engine` | 12MB | percep | TensorRT | 语义分割（`stereo_right/seg_mask`、语义代价图输入） | 自研 |
+| `perception/models/detect_v0.2.1.0.engine` | 23MB | percep | TensorRT | 通用目标检测 | 自研 |
+| `models/yolov8s-seg_640x480.engine` / `yolov8n-seg` / `yolov8n_nx` | 9~27MB | 跟随/跟踪链 | TensorRT | 行人检测 + 分割（`follow_candidates` 来源） | **开源同款** ultralytics YOLOv8 |
+| `models/clip_reid_vit_b16_{b1,b3,b5}.engine` | 174~177MB | person_track（跟随重识别） | TensorRT | CLIP-ReID ViT-B/16 行人重识别（b1/b3/b5 = 批大小三档） | **开源同款** CLIP-ReID（Seyervised/CLIP-ReID） |
+| `models/swin_tiny_solider_msmt17_{b1,b3,b5}.engine` | 59MB | person_track | TensorRT | SOLIDER 预训练 Swin-Tiny 行人 ReID（MSMT17） | **开源同款** SOLIDER（微软） |
+| `aimrt_slam/…/eigenplaces_v2.engine`（+v1/x86） | 24~46MB | aimrt_slam（**部署未运行**） | TensorRT | 全局定位 / 场景识别 | **开源同款** EigenPlaces（gmberton） |
+| `aimrt_slam/…/superpoint_v1/v2.engine` | 2.9~3.8MB | aimrt_slam（未运行） | TensorRT | 特征点提取 | **开源同款** SuperPoint（Magic Leap） |
+| `aimrt_slam/…/yolo26n-seg_v1/v2.engine` | 8.8~9.5MB | aimrt_slam（未运行） | TensorRT | 语义分割 | **开源同款** Ultralytics YOLO26-nano-seg |
+| `aprilgrid_loc/…/ppocrv6_tiny_det.fp16.engine`（arm/x86） | 3.3/10.9MB | aprilgrid_loc（部署未运行） | TensorRT | 文字检测（AprilGrid 定位配套） | **开源同款** PaddleOCR PP-OCR 系列 |
+
+#### C.1.3 推理框架汇总（一表看清「谁在哪儿跑什么」）
+
+| 推理框架 | 版本（实测） | 运行位置 | 承载模型 | 开源仓 |
+|---|---|---|---|---|
+| onnxruntime | **1.19.2** | rk CPU（mc 独占核 CPU3 实时环 + Agent CPU） | mc 全部 RL 策略（643×onnx）、silero VAD | github.com/microsoft/onnxruntime |
+| RKNN Runtime | **2.3.2** | rk **NPU**（双核，实测基线占用 Core0 ~30%） | Agent 六个视觉模型（face/gesture/hand/pose/reid） | github.com/airockchip/rknn-toolkit2（工具链） |
+| MNN | ≈3.5.0（strings 提取） | rk CPU | DTLN AEC ×2 | github.com/alibaba/MNN |
+| sherpa-onnx | **1.12.15** | rk CPU | KWS 唤醒 | github.com/k2-fsa/sherpa-onnx |
+| TensorRT + CUDA 12.6 + cuDNN 9.3 | **10.7.0.23** | orin GPU（Ampere） | 全部 orin `.engine`（24 个） | NVIDIA（闭源、公开分发） |
+| 讯飞嵌入式引擎 | miniESR 5.1 | rk CPU | VTN 唤醒 / evad / 听写 | 商业授权 |
+| 云端 LLM pipeline | — | 启元 aiem-gw（agibot.com:443） | 对话 / 意图 / VLM | 闭源服务 |
+
+#### C.1.4 task_engine 溯源（专项核实）
+
+- **身份与版本**：`/robot/software/task_engine/bin/task_engine`（19.9MB C++ 二进制），基于 **AimRT + aimrte v0.9.1-rc5.10** 构建；应用版本 `release-v1.2.1.patch1004`（2026-10-04 构建，`pipeline.json` 记录 commit）。二进制内残留构建路径 `…/software/qiyuan/modules/task_engine/build/_deps/aimrt-src/…`，表明在智元/启元内部 GitLab CI 上编译。
+- **开源状态（2026-10-30 核实）**：智元系两个 GitHub 组织——`AgibotTech`（26 仓）与 `Link-U-OS`（灵渠OS，16 仓）——**均无 task_engine 公开仓库**。即 T1 Pro 的 task_engine 目前为**闭源自研模块**，无公开开源仓地址。
+- **可对应的公开近亲**：中间件基座 **AimRT**（github.com/AimRT/AimRT，智元开源的高性能机器人运行时框架）；进程管理层 **aimrt_process_manager**（github.com/Link-U-OS/aimrt_process_manager，灵渠OS 组成部分，对应板上 em/process_manager 体系）。
+- **形态要点**：规则即配置——`cfg/rule/{q1,t1}/*.yaml` 共 **23 条任务规则**（follow/posture/whole_body/move/mapping/navigation/motion_teach/…，含优先级、前置姿态/电量/牵手门控与仲裁策略），技能资产在 `q1_skill/`、动作示教 CSV 在 `t1_motion/`；`AmRequest` 仲裁 + `real_task_type`（AnimationTask/FollowTask/InteractionTask…）驱动。
+
+### C.2 三个典型 usecase 全链路（实测时间线 + 链路图）
+
+#### C.2.0 实测时间线（事件流毫秒级对齐，2026-10-30 下午）
+
+| 阶段 | 时长 | 实测动作序列（`mc/common/state.action_info`，来源 c2_events.log） |
+|---|---|---|
+| 基线（趴卧静止） | 101s | QUADRUPED_GET_DOWN_DEFAULT(110) 趴卧 |
+| **UC1 对话「请跳个舞」** | 120s | 语音后 **~62s** 语义链路往返（云端 LLM+确认）→ 14:30:38 `READY_STAND(115)→STAND(101)` 起身（趴姿先起立）→ 14:30:42.8 **`QUADRUPED_LOCOMOTION_DANCE(109)` 四足跳舞 18s** → 14:31:13 `QUADRUPED_TO_BIPED_ROTATE(11)` → 14:31:18 `BIPED_LOCOMOTION_WBC(300)` 双足站立收势 |
+| **UC2a「趴下」** | 154s（含语音等待） | 14:33:01 `BIPED_TO_QUADRUPED_ROTATE(21)` 旋转变形 → 14:33:04 四足过渡(102) → **14:33:06 `GET_DOWN(110)` 趴稳（变形到趴稳 5s）** |
+| **UC2b「站起来」** | 79s（含语音等待） | 14:34:47 `READY_STAND(115)` → 14:34:49 **`QUADRUPED_STAND_DEFAULT(101)` 四足站立** → 14:34:52 `LOCOMOTION(102)` 运动就绪（起立全程 5s） |
+| **UC3 牵手跟随** | 326s | 14:35:13 `QUADRUPED_TO_BIPED_ROTATE(11)` 变形双足 → 14:35:18 `BIPED_LOCOMOTION_WBC(300)` → 14:36:11 跟随任务启动但 `follow/state=1 未发现目标`（全程未锁定）→ **实际为牵手带步**（用户握手、MC 力导引 WBC 步态随行）→ 14:40 结束 |
+
+#### C.2.1 UC1 对话「请跳个舞」全链路
+
+```mermaid
+flowchart LR
+    USER(["👤 用户语音<br/>「请跳个舞」"])
+    subgraph CLOUD["☁ 启元云端"]
+        LLM["aiem-gw.agibot.com:443<br/>/v1/session 多模态 LLM<br/>(对话+意图+TTS opus 回传)"]
+    end
+    subgraph RK["🖥 运控板 rk"]
+        direction TB
+        subgraph RKI["Agent 交互链（aimrt_agent）"]
+            FE["omnis_sdk 4.0.0 语音前端<br/>DTLN AEC(MNN) + silero VAD(ORT)"]
+            WAKE["讯飞 VTN 唤醒 + KWS(sherpa-onnx)"]
+            ASR["ASR（讯飞 ESR/听写）"]
+            AGENT["Agent /aimrt_agent_node<br/>semantic_intent · agent_show_text"]
+            TTSOUT["TTS 播报接收 + opus 解码"]
+        end
+        subgraph RKT["任务与运控"]
+            TE["task_engine /task_engine<br/>规则: whole_body.yaml(pri 45)<br/>AmRequest 仲裁"]
+            MC["MC /mc_ros2_node (CPU3)<br/>onnxruntime RL 跳舞策略"]
+            CAN["CAN 中断 @CPU2 → 14×执行器"]
+        end
+        subgraph RKB["表现层"]
+            AUDIO["audio_manager→PipeWire→扬声器"]
+            DISP["flutter-pi 胸屏表情"]
+            HAL0["hal_sensor 灯带/颈部灯"]
+            LUM["lumina 灯语联动"]
+        end
+    end
+
+    USER -- "4+2ref 麦克风阵列" --> FE --> WAKE --> ASR
+    ASR -- "asr_result ★ / 语义" --> AGENT
+    AGENT <-->|"HTTPS/TLS 会话<br/>(上传语音/图像 2048×1536)"| LLM
+    AGENT -- "semantic_intent + agent_show_text" --> TE
+    TE ==>|"★ SetMcAction(109 跳舞)<br/>★ SetMcMotion / (趴姿先 SetMcAction 起身)"| MC
+    MC -- "1kHz 级关节指令" --> CAN
+    TE -->|"★ PlayTts"| AGENT --> TTSOUT --> AUDIO
+    TE -->|"PlayEmotion ★ / SetFaceMode"| DISP
+    TE -->|"★ LedStripCommand(舞蹈灯语)"| HAL0
+    LUM -.->|"订阅 play_state/interaction 等 9 路"| AUDIO
+    TE -.->|"interaction/state ★ 任务状态"| LUM
+```
+
+读图要点（实测佐证）：
+1. **语义往返 ~62s**：语音指令到首个动作（起身）间隔 62s，为云端 LLM 会话（含意图判定与话术生成）+ 任务仲裁链路的总时延；本地链路（Agent→TE→MC）毫秒级。
+2. **跳舞本体是 RL 策略**：`QUADRUPED_LOCOMOTION_DANCE(109)` 映射 `rl/quad_walk_dance.yaml`→onnxruntime 在隔离核 CPU3 实时推理（动作库含 `douyin_3500`、`q1_danceGo`、`q1_ladingwu2` 等多种舞曲策略，另有 CSV 轨迹模仿舞 `BIPED_MIMIC_DANCE_*`）。
+3. **多模态反馈同步**：TTS（云端 opus→audio_manager 播放）、胸屏表情（PlayEmotion）、灯带灯语（LedStripCommand + lumina 联动）与动作并行下发——UC1 期间 display_ui CPU 12%→28%、audio_manager 微升、agent 108%→128%（见 C.3）。
+4. **前置姿态处理**：机器人当时趴卧，TE 先经 SetMcAction 起身到四足站立（whole_body 规则 `block_posture: LYING_DEFAULT…` 趴卧禁止直接跳全身舞），舞毕自主 `QUADRUPED_TO_BIPED_ROTATE` 转双足站立收势。
+
+#### C.2.2 UC2 姿态切换「趴下 → 四足站立」
+
+```mermaid
+flowchart LR
+    USER(["👤 语音「趴下」/「站起来」<br/>(或 App · 遥控器)"])
+    subgraph RK["🖥 运控板 rk"]
+        AGENT["Agent 意图(云端 LLM / 本地 NLU 规则)"]
+        TE["task_engine<br/>规则: posture.yaml<br/>AnimationTask · pri 50 · 可抢占"]
+        MC["MC /mc_ros2_node (CPU3)<br/>姿态 FSM + RL 策略"]
+        CAN["CAN @CPU2 → 关节"]
+    end
+    USER --> AGENT -- "semantic_intent" --> TE
+    TE ==>|"★ SetMcAction<br/>趴下: BIPED_TO_QUADRUPED_ROTATE(21)→GET_DOWN(110)<br/>站起: READY_STAND(115)→STAND(101)→LOCOMOTION(102)"| MC
+    MC -- "关节指令" --> CAN
+    MC ==>|"★ mc/common/state（action_info.switch_ready / posture / form_state）"| TE
+    TE -.->|"完成播报 PlayTts"| USER
+```
+
+门控与要点（实测规则 + 事件流）：
+1. **任务规则前置检查**（`rule/t1/posture.yaml`）：`allow_held_state: false`（**牵手状态下拒绝姿态切换**）；`posture_exemptions "4":[battery, charging]`（趴下动画豁免低电/充电态——趴下充电场景）；任意姿态可触发、可被 move/posture/upper_body 抢占。
+2. **实测节奏**：双足→趴稳 5s（21→102→110）；趴→四足站立 5s（115→101→102）；动作完成以 `mc/common/state.action_info` 状态回报 TE 闭环。
+3. 姿态切换全链路在 rk 板内闭环（不涉 orin），语义段走云端。
+
+#### C.2.3 UC3「牵着 T1 的手一起走」（跟随）
+
+```mermaid
+flowchart LR
+    USER(["👤 用户: 语音「跟着我」<br/>+ 牵手带步"])
+    subgraph RK["🖥 运控板 rk"]
+        AGENT["Agent 意图"]
+        TE["task_engine<br/>规则: follow.yaml (pri 50)<br/>电量≥6% · odom 可信"]
+        MC["MC /mc_ros2_node (CPU3)<br/>双足 WBC + 力导引牵行步态"]
+        CAN["CAN @CPU2 → 关节"]
+    end
+    subgraph ORIN["🧠 大脑板 orin"]
+        PTR["person_track<br/>yolov8s-seg + clip_reid/swin ReID<br/>(TensorRT @GPU)"]
+        FLW["follow_node 语义跟随规划<br/>(decoupled-PID+零相位低通)"]
+    end
+    USER --> AGENT -- "semantic_intent" --> TE
+    TE ==>|"FollowTaskCtrl(type=1 跟随)"| X1{"任务分发"}
+    X1 ==>|"set_follow_perception_task(启搜)"| PTR
+    X1 ==>|"SetFollowTaskBiped"| FLW
+    PTR -.->|"follow_candidates ★ (本例未锁定目标<br/>follow/state=1 未发现)"| TE
+    FLW -.->|"velocity(source=follow)→MC<br/>(视觉跟随路径·本例未生效)"| MC
+    USER == "牵手（关节力矩感知）" ==> MC
+    MC ==>|"held_state: McHandHeldState<br/>(LEFT/RIGHT_HELD · is_held)"| TE
+    MC -- "WBC 牵行关节指令" --> CAN
+    MC ==>|"★ mc/common/state(held_state/is_moving)"| TE
+```
+
+读图要点（本例为「未锁定目标的牵手带步」）：
+1. **双路径设计**：实线 = 视觉跟随路径（person_track 检测+ReID → follow_candidates★ → follow_node 语义规划 → `velocity`→MC 按 `SetMcInputSource` 仲裁），虚线标注本例实际状态——**跟随任务已启动但全程 `follow/state=1 未发现目标`**（牵手位置遮挡相机视角），未产生跟随速度指令。
+2. **实际生效机制 = 牵手带步**：MC 通过关节电流/力矩实时估计 `McHandHeldState`（UNKNOWN/BOTH_NOT_HELD/LEFT_HELD_ONLY/RIGHT_HELD_ONLY/BOTH_HELD + `is_held`），牵手后机器人先自主变形双足（实测 `QUADRUPED_TO_BIPED_ROTATE(11)`→`BIPED_LOCOMOTION_WBC(300)`），在 WBC 全身控制下以力导引随人迈步——**该路径不经 `velocity` 话题，完全在 MC 实时层闭环**。
+3. **held_state 的反向作用**：任务规则层以 `allow_held_state: false` 门控姿态切换/示教/遥控等 8 类任务（牵手时拒绝），即牵手既是控制输入也是任务态约束。
+4. **资源侧证据**：UC3 期间 orin `follow_node` 0.1%→10.4%、`percep` 9.3%→23.9%、`nav2_stack` 1.7%→14.1%（目标搜索与规划激活），rk `task_engine` 19%→31.6%、`legged_odom` 36%→43%（行走中里程计满负荷），见 C.3。
+
+#### C.2.4 三 usecase 涉及的节点 / Topic / Service 明细表（与上图逐条对应）
+
+**UC1 对话「请跳个舞」：**
+
+| 板 | 节点（进程） | Topic | Service |
+|---|---|---|---|
+| 云端 | aiem-gw LLM 会话（非 ROS） | — | HTTPS/TLS `/v1/session` |
+| rk | `/aimrt_agent_node`（Agent） | 发：`asr_result`★、`semantic_intent`、`agent_show_text`、`tts_status`；订：`sm/system_state`、`permission_state` | 服务端：`PlayTts`★、`GetAndPlayNlgText`、`SetTtsParameters`；客户端：`PlayEmotion`、`AmRequest`/`ControlTask` |
+| rk | `/task_engine`（任务引擎） | 订：`semantic_intent`、`agent_show_text`、`interaction_state`、`biologic_state`、`mc/common/state`★、`display_state`；发：`interaction/state`★、`task_engine/task_status` | 客户端：`SetMcAction`★、`SetMcMotion`★、`SetMcPresetMotion`★、`PlayTts`★、`PlayEmotion`/`SetFaceMode`、`LedStripCommand`★、`AmRequest`、`ControlTask` |
+| rk | `/mc_ros2_node`（MC·CPU3） | 发：`mc/common/state`★（action_info/进度）、`hds/diagnostic_list` | 服务端：`SetMcAction`★、`GetMcAction`★、`SetMcInputSource`★ |
+| rk | `/audiomanager_ros2_node`（音频） | 发：`play_state`、`volume` | 服务端：`PlayAudioFile`★、`GetVolume/SetVolume`★（TTS 音频经 PipeWire TCP 6001/4713 直放） |
+| rk | `/hal_sensor_soc0`（HAL） | 发：`bms/state`★ | 服务端：`LedStripCommand`★（舞蹈灯语） |
+| rk | `/lumina_server`（灯效） | 订：`play_state`、`tts_status`、`interaction/state` | 客户端：`PlayEmotion`、`PlayLight` 等 13 路 |
+| rk | 胸屏 display_ui（非 ROS） | `display_state`（屏侧回显） | 经 `PlayEmotion`★ 服务（TE 承接）联动 |
+| rk | `/sm` | 发：`sm/system_state`（全链门控） | `SmNodeService/*` proto 广播 |
+| rk | `/app_proxy`、`/cloud_proxy`（旁路镜像） | 订：`interaction/state`★、`trace/events` | App/云同步（不参与控制） |
+
+**UC2 姿态切换「趴下→四足站立」：**
+
+| 板 | 节点 | Topic | Service |
+|---|---|---|---|
+| rk | `/aimrt_agent_node` | 发：`semantic_intent` | （意图→TE） |
+| rk | `/task_engine`（规则 `posture.yaml`） | 订：`mc/common/state`★、`bms/state`★（低电门控）；发：`interaction/state`★ | 客户端：`SetMcAction`★（21→110 趴下 / 115→101→102 站起）、`GetMcAction`★；服务端：`PlayAnimation`（App/语音入口同构） |
+| rk | `/mc_ros2_node` | 发：`mc/common/state`★（`action_info.switch_ready`、`posture`、`form_state`）、`hds/diagnostic_list` | 服务端：`SetMcAction`★、`GetMcAction`★ |
+| rk | `/hal_sensor_soc0` | 发：`bms/state`★（电量前置检查） | — |
+| rk | `/sm` | 发：`sm/system_state` | `MigrateSystemState`（开机自检等状态门控） |
+
+**UC3「牵着 T1 的手一起走」（跟随）：**
+
+| 板 | 节点 | Topic | Service |
+|---|---|---|---|
+| rk | `/aimrt_agent_node` | 发：`semantic_intent` | 客户端：`FollowTaskCtrl`（→TE） |
+| rk | `/task_engine`（规则 `follow.yaml`） | 订：`follow/state`★、`follow_candidates`★、`mc/common/state`★（**held_state 牵手态**）、`odom/status`；发：`interaction/state`★ | 服务端：`FollowTaskCtrl`；客户端：`/perception/set_follow_perception_task`、`SetFollowTaskBiped`、`SetMcInputSource`★（视觉路径抢占输入源） |
+| orin | `/aimrt_person_track_node(+_srv)`（person_track） | 发：`follow_candidates`★、`target_info`；订：`enable_follow`、`follow_target_selection` | 服务端：`/perception/set_follow_perception_task` |
+| orin | `/follow_node`（follow） | 发：`follow/state`★、`enable_follow`、`follow_target_selection`、`mc/locomotion/velocity`（source=follow） | 服务端：`SetFollowTaskBiped` |
+| orin | `/perception`、`/coreon_fusion_ros2_node`（感知支撑） | `percep/local_costmap`、`target_info`、融合 27 路输入 | `ObstacleCheck`、`SetAvoidance`（避障联动） |
+| orin | nav2 组件容器（避障通路） | `velocity`（source=pnc，视觉跟随时叠加避障） | `/navi/command`★ 系列（本例未用） |
+| rk | `/mc_ros2_node`（MC·CPU3） | 订：`mc/locomotion/velocity`；发：`mc/common/state`★（`held_state: McHandHeldState`、`is_moving`） | 服务端：`SetMcInputSource`★、`GetCurrentInputSource`★ |
+| rk | `/legged_odom_node` | 发：`/odom`、`/tf`（→orin 跟随/导航链） | — |
+
+> 注：本例实际生效的**牵手带步不经过 ROS 接口**（MC 实时层关节力矩闭环），上表接口承载任务编排、目标搜索与状态广播；视觉速度路径（`velocity`←follow_node）本次未激活。
+
+### C.3 三个 usecase 下的运行资源占用（实测）
+
+> **方法与口径**：① 进程 CPU/内存 = 两板 `top -b -d 3 -w 220` 全进程快照（16 分钟连续采样，按 C.2.0 阶段窗口取均值；`%CPU` 为区间瞬时值，100%=单核，>100%=多核）；② rk GPU=devfreq `*gpu*/load`（Mali-G52），NPU=debugfs `rknpu/load`（双核）；③ orin GPU=`tegrastats GR3D_FREQ`、功耗=`VDD_IN`；④ 进程→模块归属按 `/robot/software/<app>`（cwd+args 双重判定）；⑤ 板级 busy 含采样器自身开销（全进程 top 轮询约占数个百分点，进程表已剔除采样器进程）。
+> **GPU「显存」口径**：两板均为**统一内存**架构（Jetson UMA / rk3576 CPU-GPU 共享 DDR），无独立显存统计——GPU 侧内存即进程 RSS 中的张量缓冲（orin `cudaMalloc`、rk NPU `dma_buf` 均来自统一内存），故下表以 RSS + GPU/NPU 利用率共同表征。
+> 阶段窗口：BASE=101s 静止基线；UC1=对话+跳舞；UC2a=趴下；UC2b=四足站立；UC3=牵手跟随带步（含任务启动与行走）。
+
+#### C.3.1 rk 板：软件模块/进程级（CPU% 各阶段均值 · RSS）
+
+| 进程（模块） | 所属 slice | BASE | UC1 | UC2a | UC2b | UC3 | RSS(MB) |
+|---|---|---|---|---|---|---|---|
+| **aimrt_agent**（Agent 对话智能体+语音前端+NPU 视觉） | interaction | 107.6 | **128.5** | 107.4 | 117.3 | 101.2 | **1434** |
+| **mc**（MC 运动控制 · CPU3 独占 · RL 实时推理） | realtime | 75.4 | 74.3 | 76.5 | 74.5 | 77.1 | 253 |
+| device_manager（设备管理） | realtime | 62.7 | 59.2 | 61.1 | 60.6 | 57.9 | 45 |
+| legged_odom（足式里程计） | system | 36.4 | 42.2 | 39.1 | 41.9 | **43.0** | 62 |
+| drp（rosbag 持续录包） | system | 34.9 | 32.3 | 33.3 | 33.0 | 31.2 | 66 |
+| app_proxy（App 状态镜像 29 路订阅） | system | 29.9 | 30.5 | 30.2 | 30.1 | 30.3 | 124 |
+| **task_engine**（任务引擎） | interaction | 19.0 | 27.5 | 24.7 | 26.8 | **31.6** | 84 |
+| display_ui（flutter-pi 胸屏渲染） | interaction | 12.2 | **28.5** | 21.3 | 29.7 | 28.2 | 226 |
+| hal_camera（rk 侧相机 HAL） | system | 14.2 | 15.0 | 14.6 | 15.1 | 14.8 | 446 |
+| lumina（灯效服务） | system | 11.3 | 12.0 | 12.3 | 12.2 | 13.2 | 92 |
+| hal_rgbd（rk 侧 ToF/RGBD HAL 实例①） | system | 9.4 | 10.2 | 9.8 | 10.1 | 10.0 | 40 |
+| rc（体感遥控接入） | system | 6.6 | 7.0 | 6.8 | 7.1 | 6.8 | 50 |
+| ota（ota_master） | system | 5.1 | 5.2 | 5.2 | 5.2 | 5.1 | 63 |
+| cloud_proxy（云端代理） | system | 5.0 | 4.9 | 5.0 | 5.0 | 4.9 | 351 |
+| insta360（云台接入） | system | 3.9 | 4.0 | 4.0 | 3.9 | 3.9 | 43 |
+| hal_sensor（HAL soc0：BMS/灯/舵机） | system | 3.4 | 3.6 | 3.5 | 3.6 | 3.5 | 74 |
+| housekeeper（管家） | system | 3.1 | 3.4 | 3.0 | 3.1 | 3.1 | 132 |
+| abox（日志） | system | 2.9 | 3.0 | 3.0 | 3.1 | 3.0 | 75 |
+| sm（状态机） | system | 2.9 | 3.0 | 2.9 | 3.0 | 2.9 | 57 |
+| audio_manager（音频管理/播放） | interaction | 2.5 | 3.0 | 2.7 | 2.7 | 2.7 | 59 |
+| hds（健康诊断） | system | 2.3 | 2.4 | 2.3 | 2.3 | 2.4 | 53 |
+| pipewire_audio（PipeWire 音频服务） | 系统 | 1.0 | 2.3 | 1.5 | 2.1 | 2.2 | 78 |
+| connx（圈圈 quanji_uwb 接入②） | system | 1.6 | 1.7 | 1.7 | 1.6 | 1.7 | 73 |
+| sys_guard（场景看护） | system | 1.0 | 1.9 | 1.2 | 1.6 | 1.2 | 48 |
+| scene_engine（场景引擎） | system | 1.2 | 1.2 | 1.3 | 1.3 | 1.3 | 41 |
+| data_exporter | auxiliary | 0.7 | 0.8 | 0.7 | 0.8 | 0.7 | 56 |
+| resource_manager（picture_service） | system | 0.7 | 0.7 | 0.7 | 0.7 | 0.7 | 54 |
+| mosquitto（conduit_router TLS） | 系统 | 0.6 | 0.5 | 0.5 | 0.5 | 0.5 | 12 |
+| rtsp_server | system | 0.2 | 0.2 | 0.2 | 0.2 | 0.2 | 121 |
+| iox-roudi（iceoryx 共享内存总线③） | 系统 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 794 |
+| process_manager | 系统 | 0.6 | 0.7 | 0.7 | 0.7 | 0.7 | 43 |
+| 其他（ptp4l/hostapd/dnsmasq/chronyd/NetworkManager/secret_store 等） | 系统 | <1/项 | | | | | ~120 合计 |
+
+① rk 侧亦部署 hal_rgbd 实例（soc0 manifest stage1 实含，§3.2 表未列，本次实测补录）。② 圈圈接入进程位于 connx 应用目录（`aimrt_main --cfg=quanji.yaml`）。③ RSS 主要为 iceoryx 共享内存段映射（全板共享），非私有内存。
+
+#### C.3.2 orin 板：软件模块/进程级
+
+| 进程（模块） | BASE | UC1 | UC2a | UC2b | UC3 | RSS(MB) |
+|---|---|---|---|---|---|---|
+| hal_camera（相机 HAL：双目/鱼眼/彩色+头部 IMU） | 40.7 | 40.6 | 41.4 | 41.5 | 41.5 | **707** |
+| hal_rgbd（5 目 ToF HAL） | 38.9 | 38.8 | 38.9 | 38.9 | 38.7 | 344 |
+| nav2_perception（点云合并+perception_node） | 17.0 | 18.6 | 18.5 | 19.0 | 19.5 | 100 |
+| **percep（感知算法：分割/深度/检测 @GPU）** | 9.3 | 18.7 | 15.9 | 15.3 | **23.9** | 322 |
+| coreon_fusion（多源融合 27 路输入） | 5.3 | 7.6 | 7.0 | 7.2 | 8.7 | 355 |
+| person_track（人体跟踪+ReID @GPU） | 3.8 | 4.5 | 4.3 | 4.4 | 5.1 | 279 |
+| **nav2 栈组件容器**（bt_navigator/controller/planner/behavior/smoother/map_server/双层 costmap）① | 1.7 | 9.8 | 7.3 | 8.6 | **14.1** | 117 |
+| follow（follow_node+launch，语义跟随规划） | 0.1 | 5.5 | 3.8 | 4.5 | **10.4** | 144 |
+| brightness（亮度检测） | 1.8 | 2.0 | 1.9 | 2.0 | 2.2 | 37 |
+| path_follow（trajectory_tracker 运镜） | 1.0 | 1.8 | 1.6 | 1.7 | 2.3 | 36 |
+| hal_sensor（soc1：ADU/温度） | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 38 |
+| nav2_lifecycle_manager（t1_perception） | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 35 |
+| nav2 launch（ros2 launch python） | 0.4 | 0.4 | 0.4 | 0.4 | 0.4 | 76 |
+| process_manager（soc1 实例） | 0.4 | 0.4 | 0.4 | 0.4 | 0.4 | 173 |
+| sys_guard / ota_slave / data_exporter | 0.8/0.8/0.6 各 | → | | | 微升 | 51/60/61 |
+| iox-roudi（共享内存总线②） | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 850 |
+| 其他（ptp4l/NM/tetherd 等） | <1/项 | | | | | ~20 |
+
+① Nav2 生命周期节点以组件容器（component_container_mt，节点名 nav2_container）组合运行，仅 perception 链/lifecycle 独立进程——与 §3.3 进程表一致。② 同 rk 注③。
+
+#### C.3.3 子系统级（rk 按 em cgroup slice 汇总；orin 全部业务在 robot_system.slice）
+
+| 子系统（slice） | 成员 | BASE | UC1 | UC2a | UC2b | UC3 | RSS(MB) |
+|---|---|---|---|---|---|---|---|
+| rk `robot_realtime.slice`（CPUWeight 10000 · MemoryMin 500MB） | mc + device_manager | 138.1 | 133.5 | 137.6 | 135.2 | 135.0 | 297 |
+| rk `robot_interaction.slice`（CPUWeight 3000） | agent + display_ui + audio_manager + task_engine | 141.2 | **187.6** | 156.0 | 176.5 | 163.6 | 1802 |
+| rk `robot_auxiliary.slice`（CPUWeight 500 · **CPUQuota 40%**） | data_exporter | 0.7 | 0.8 | 0.7 | 0.8 | 0.7 | 56 |
+| rk `robot_system.slice` + 系统服务（CPUWeight 5000/10000） | 其余全部业务 + iox-roudi/音频/网络等基座 | 181.9 | 192.8 | 187.8 | 191.4 | 190.0 | —（含 iox 794 共享） |
+| orin 全部业务（robot_system.slice，soc1 manifest 未再分组） | 上表全部 | ~123 | ~150 | ~138 | ~143 | **~173** | — |
+
+#### C.3.4 整机级
+
+| 维度 | 板 | BASE | UC1 跳舞 | UC2a 趴下 | UC2b 站立 | UC3 牵手 |
+|---|---|---|---|---|---|---|
+| CPU 总占用（busy%） | rk（8 核） | 74.8% | **83.6%** | 78.7% | 81.9% | 80.6% |
+| | orin（6 核） | 67.8% | 72.9% | 71.3% | 71.7% | **76.4%** |
+| 内存 used/total | rk | 3812/7919 MiB | 3846 | 3852 | 3850 | 3853 |
+| | orin（tegrastats） | 3740/7604 MiB | 3751 | 3752 | 3756 | 3771 |
+| GPU 算力利用率 | rk Mali-G52 | 33% | 33% | 33% | 34% | 34% |
+| | orin GR3D（Ampere） | 14% | 14% | 17% | 13% | 13% |
+| NPU 利用率（rk 3576 双核） | NPU Core0/Core1 | 29/10% | 31/5% | 33/9% | 33/6% | **36**/6% |
+| 整板功耗 | orin VDD_IN | 9.2W | 9.4W | 9.3W | 9.3W | 9.5W |
+
+**结论要点**：① rk 常态即高负载（~75% busy），最大消耗者为 Agent（108%≈1.1 核 + 1.4GB，含语音前端与 NPU 视觉模型驻留）；跳舞时增量主要落在 **interaction slice（+33%）**：Agent 语义链路 + 胸屏表情渲染翻倍 + task_engine；MC 实时核负载基本恒定（RL 策略常驻推理，与动作类型弱相关）。② orin 感知为常驻负载（GPU 13~17%），任务增量集中在 **percep（+9~15pp）与 nav2 栈（+7~12pp）、follow（+10pp @UC3）**；UC3（牵手行走）是 orin 最重场景（busy 76.4%）。③ NPU 仅 Agent 使用，行走/交互时升至 36%（人脸+手势连续推理）。④ 内存对各 usecase 几乎不敏感（±40MiB，模型全部常驻）；GPU 利用率两板均处低位，说明推理以小模型/低帧率运行，算力余量大。⑤ 功耗（orin 9.2→9.5W）对 usecase 不敏感。
+
+### C.4 启动脚本与部署资源
+
+#### C.4.1 开机自启链路（systemd 实测）
+
+| 阶段 | rk（soc0） | orin（soc1） |
+|---|---|---|
+| 挂载/硬件初始化 | `system_entry.service`（`/robot/software/entry/system_entry.sh` 硬件上电初始化）；`robot-sdumount@.service`（SD 卡）；`camera-manage.service` | `robot-mount-software.service`（**按 A/B 槽位挂载软件分区**，Before local-fs）→ `system_entry.service`；`camera-start.service`（`/opt/camera_driver/load_module.sh` insmod 相机驱动） |
+| 时钟/网络 | NetworkManager；`ptp4l`（linuxptp，PTP 主从）；chrony | `sync_time.service`（**阻塞等 ping 通 rk(10.1.1.100) 再执行** `/usr/local/bin/sync_time.sh`，Before ptp4l）+ ptp4l |
+| 零拷贝总线 | `iox-roudi.service`：`/robot/software/entry/run_roudi.sh` → `/opt/iceoryx/bin/iox-roudi -c …/roudi_config.toml -m on`；User=1000；**OOMScoreAdjust=-1000**；Restart=on-failure×5 | 同左（soc1 实例） |
+| 应用编排 | **`em.service`**：EnvironmentFile=`/robot/software/entry/cfg/em.env`；ExecStart=`/robot/software/process_manager/bin/start_process_manager.sh`；**Restart=always（5s）**·KillMode=control-group | 同左（After=system_entry+iox-roudi+camera-start+sync_time） |
+| 板间/外围 | `tetherd.service`（内网以太网守护，`--bind 10.1.1.100`）；hostapd@/dnsmasq@（p2p0 热点）；mosquitto（conduit_router_tls.conf）；`fce863r-bt.service`（蓝牙） | `tetherd.service`（`--bind 10.1.1.101`）；robot_fancontrol/robot_ptp 等（disabled 备用） |
+| 资源切片 | `robot.slice`（CPUWeight 10000）+ 四个业务子 slice（见 C.4.3） | `robot.slice`（soc1 业务不再分组） |
+
+`start_process_manager.sh` 逻辑：source `/robot/software/entry/cfg/env.sh` → 按机型/硬件版本查 `CFG_MAP`（Q1/T1 × v1d0~v2d1 × soc0/1 → 对应 yaml；本机 `T1:T1_v2d0` → `t1_v2d0_soc0/soc1_config.yaml`）→ 启动 `process_manager`，其内置 AimRT net(HTTP 50080)/mqtt(127.0.0.1:1883)/ros2 三插件与 `EmAppService` RPC，再按 stages 逐个 `sudo -u #1000 … /robot/software/<app>/bin/em_run.sh` 拉起应用并守护。
+
+#### C.4.2 em 启动编排（`process_manager_config.yaml` + `t1_v2d0_soc{0,1}_config.yaml` 实测）
+
+**rk 四个启动阶段（stage 间延时后串行）：**
+
+| Stage | 延时 | 应用（按序） |
+|---|---|---|
+| 1 | +1500ms | sys_guard、**mc**、hal_rgbd、audio_manager、device_manager、hal_sensor、sm、hds、**agent**、display_ui |
+| 2 | +5000ms | **task_engine**、housekeeper、app_proxy、rc、data_exporter、hal_camera、rtsp_server、drp、ota、odom、lumina、scene_engine、insta360、connx、resource_manager、abox |
+| 3 | +5000ms | conduit_router（mosquitto TLS） |
+| 4 | +8000ms | cloud_proxy |
+
+**orin 两个启动阶段：**
+
+| Stage | 延时 | 应用 |
+|---|---|---|
+| 1 | +1500ms | sys_guard、hal_rgbd、hal_camera、hal_sensor |
+| 2 | +8000ms | data_exporter、ota、**coreon_fusion**、**follow**、path_follow、tracking(person_track)、brightness_detection、**navigation(nav2)**、**percep** |
+
+> 部署在位但 manifest 注释未启动：orin 的 `slam`、`aprilgrid_loc`、`map_manager`、`recharge`、`drp`、`move_camera`/`face`/`yolov8`（rk 侧同）——与 C.3.2 资源表一致。另有低层二开模式开关：`MC_LOW_LEVEL_DEV=true` 时 PM 跳过自动启动 mc、mc 的 backend 从 iceoryx 切 ros2（em_run.sh 内置）。
+
+**每个应用的启动脚本**统一为 `/robot/software/<app>/bin/em_run.sh`（cd 本目录 → 注入 `LOG_PATH`/`LD_LIBRARY_PATH=../lib:./` → 应用特有 env → `exec ./<binary> --cfg_file_path=cfg/*.yaml`）。两个代表性样例：
+- `mc/bin/em_run.sh`：`SUB_NO_SCHEDULER=true`、`ROBOT_ENABLE_HDS/EVENT/MONITOR=false`、`AIMRT_PLUGIN_SHM_DEFAULT_WAIT_TIME_US=300`、**`AIMRTE_THREAD_SETTING_SHM/UDPany="[2,3]|SCHED_RR:80"`**（SHM/UDP 线程预设 SCHED_RR 80、钉 CPU2/3——当前被 SUB_NO_SCHEDULER 屏蔽，实测未激活）、`TOPIC_ENABLE_BACKEND=iceoryx`。
+- `task_engine/bin/em_run.sh`：通用模板 + SD 卡权限自修复（OTA 后 /robot/userdata/sd root→run）→ `./task_engine --cfg_file_path=cfg/interaction_module_config.yaml`。
+
+**每个启动脚本（em 应用）拉起的进程 → ROS 2 节点 → 接口规模**（P/S/V/C = 发布/订阅/服务端/客户端，数据引自 §4.1/§4.2 实测；「非 ROS」= iceoryx 或私有协议通道）：
+
+| rk 应用（em_run.sh） | 拉起节点 | P/S/V/C | orin 应用 | 拉起节点 | P/S/V/C |
+|---|---|---|---|---|---|
+| mc | `/mc_ros2_node` | 4/2/13/0 | sys_guard | `/sys_guard_node_soc1` | 3/1/2/0 |
+| agent | `/aimrt_agent_node` | 15/8/18/24 | hal_rgbd | `/hal_rgbd_node(+_0)` | 9/17/3/1 |
+| task_engine | `/task_engine` | 12/39/30/51 | hal_camera | `/hal_camera(+_1)` | 8/4/7/2 |
+| sm | `/sm` | 3/2/4/28 | hal_sensor | `/hal_sensor_soc1` | 3/0/1/0 |
+| audio_manager | `/audiomanager_ros2_node` | 9/1/15/1 | coreon_fusion | `/coreon_fusion_ros2_node` | 7/27/7/1 |
+| hal_sensor | `/hal_sensor_soc0` | 6/2/9/0 | follow | `/follow_node` | 9/1/1/0 |
+| device_manager | `/device_manager_node` | 1/0/0/1 | path_follow | `/trajectory_tracker` | 5/2/1/0 |
+| hds | `/hds` | 2/3/3/1 | tracking | `/aimrt_person_track_node(+_srv)` | 6/4/1/1 |
+| housekeeper | `/housekeeper0` | 6/0/23/2 | brightness_detection | `/aimrt_brightness_status_node(+_srv)` | 1/1/0/1 |
+| app_proxy | `/app_proxy`(+`_client`) | 3/29/3/2 | navigation | Nav2 12+ 节点（`/robot_navigation`、`/map_server`、bt/controller/planner/behavior/smoother/双层 costmap、lifecycle） | 见 §4.4 |
+| rc | `/rc` | 3/0/2/6 | percep | `/perception` | 10/5/1/0 |
+| ota | `/ota_master` | 3/5/2/10 | data_exporter | `/data_exporter`（soc1 实例） | 1/0/12/10 |
+| odom | `/legged_odom_node` | 8/1/2/0 | ota | `/ota_slave` | 2/0/2/0 |
+| data_exporter | `/data_exporter`（soc0 实例） | 1/0/12/10 | | | |
+| lumina | `/lumina_server` | 1/9/0/13 | | | |
+| insta360 | `/insta360_ros2_node`(+`_gimbal_tts`) | 6/2/3/3 | | | |
+| connx | `/quanji_uwb_ros2_node` | 5/0/1/0 | | | |
+| resource_manager | `/picture_service` | 3/1/10/3 | | | |
+| drp | `/record_ros2_node_*` | 1/4/2/0 | | | |
+| cloud_proxy | `/cloud_proxy` | 3/7/0/1 | | | |
+| rtsp_server | `/rtsp_video_server` | 0/0/0/1 | | | |
+| sys_guard | `/sys_guard_node_soc0` | 3/1/2/0 | | | |
+| display_ui / scene_engine / hal_camera(rk) / hal_rgbd(rk) / abox / conduit_router / secret_store | 非 ROS（iceoryx/私有协议/mosquitto） | — | | | |
+
+#### C.4.3 进程优先级与资源切片总表（实测 `ps -eLo` + cgroup）
+
+| 优先级机制 | 实测值 | 说明 |
+|---|---|---|
+| 调度策略 | **全部进程/线程 SCHED_OTHER、Nice 0**（无 RT 线程在跑） | mc 的 SCHED_RR:80 为预设未启用（见上） |
+| CPU 亲和性 | 普通进程 `0,1,4-7`（isolcpus=2,3）；**mc 36 线程钉 CPU3**；**CAN0/CAN1 中断(irq83/84)+rk_timer 钉 CPU2** | §2.2 实测一致 |
+| cgroup CPUWeight | `robot.slice` 10000 → realtime **10000**（+**MemoryMin=500MB**）/ system 5000 / interaction 3000 / auxiliary 500 + **CPUQuota 40%**（cpu.max=40000/100000） | realtime=mc+device_manager；interaction=agent+display_ui+audio_manager+task_engine；auxiliary=data_exporter；其余 → robot_system |
+| 守护优先级 | em.service Restart=always/5s；iox-roudi OOMScoreAdjust=-1000（最后被杀）；process_manager 按配置重启子应用 | hds+sys_guard 健康诊断兜底 |
+
+各启动脚本拉起的进程→ROS 2 节点→topic/service 全量挂载见 §4.1/§4.2（进程→节点总表）与 §5（接口全表）；每个 em 应用 = 一个 em_run.sh + 一组节点 + 一片接口面（如 task_engine = `/task_engine` 节点，P12/S39/V30/C51）。
+
+#### C.4.4 部署资源清单与大小（`du`/`find -printf` 实测）
+
+**rk 板 `/robot/software` = 4.8G**（另有 `/opt/ros/humble` 276M、`/opt/iceoryx` 74M）：
+
+| 目录 | 大小 | 内容要点 |
+|---|---|---|
+| mc | **1.3G** | 运控二进制 + 6 套机型 cfg（`qd1_t2d0` 激活 264M、`q1_t2d0` 298M、`qd1_t1d5` 205M、`q1_t0d0` 159M、其余 95M——主体为 **643 个 RL 策略 onnx** 与 mimic CSV） |
+| aimrt_agent | 985M | Agent 二进制 + lib（MNN/ORT/RKNN/sherpa/讯飞/ffmpeg6.0/opencv4.8.1 自带）+ cfg 496M（omnis 模型、t1 人脸/手势 6 模型 ~190M）+ third_party（讯飞 ESR 93M + VTN SDK 86M） |
+| scene_engine | 273M | 场景引擎（lib 223M；iceoryx 通道、无 ROS 节点） |
+| task_engine | 230M | 二进制 19.9M + 规则/技能资产 + 74 个提示音 wav |
+| cloud_proxy | 162M | 云端代理 |
+| aimrt_pulsecore | 160M | 音频核（部署未运行） |
+| ota 114M · hal_rgbd 108M · insta360 102M · connx 102M · drp 98M · audio_manager 98M · process_manager 96M · data_exporter 94M · resource_manager 92M · hds 90M · rc 89M · sm 86M · hal_camera 85M · legged_odom 84M · hal_sensor 84M · sys_guard 83M · display_ui 82M（Flutter bundle）· device_manager 77M · interface 49M（aimdk_msgs）· app_proxy 47M · lumina 34M · housekeeper 33M · rtsp_server 23M · conduit_router 4.2M · entry 2.7M · secret_store/abox/param <1M | 2.3G 合计 | 其余业务应用（每应用自带 AimRT 运行时三件套） |
+| **按类型汇总** | — | 可执行+so ~1.55G（so 1697 个）；**onnx 模型 ~1.0G/643 个**；yaml 688；json 169；csv 581（示教动作）；**wav 105**（task_engine 74 + agent 31）；**mp4 45**（display_ui 表情视频 42 + task_engine 3） |
+
+**orin 板 `/robot/software` = 3.0G**（另有 `/opt/ros/humble` 285M）：
+
+| 目录 | 大小 | 内容要点 |
+|---|---|---|
+| algorithm | **1.2G** | colcon 工作空间（nav2 1.1.20 全家 + jps_planner/recharge 定制包 + follow/path_follow/percep/person_track/brightness/explore 等）+ **models 715M**（clip_reid ×3 + swin_solider ×3 + yolov8 系列）+ perception/models 79M（Stereo/Segment/detect） |
+| aimrt_slam | 457M | **部署未运行**：support_files 183M（eigenplaces/superpoint/yolo26n-seg engine 双架构副本） |
+| coreon_fusion | 286M | 融合算法 |
+| ota 114M · aprilgrid_loc 107M（未运行，含 ppocr engine）· hal_rgbd 106M · drp 97M（未运行）· process_manager 95M · data_exporter 94M · hds 90M · hal_camera 85M · map_manager 84M（未运行）· hal_sensor 84M · sys_guard 83M · interface 49M · housekeeper 33M · entry/param/配置 <1M | 1.03G 合计 | 其余业务应用 |
+| **按类型汇总** | — | so 1279 个；**TensorRT engine 24 个（~993M）**；yaml 393；json 60；png 7；csv 10 |
+
+> 部署口径说明：① 两板 `/robot/software` 均由 A/B 槽位分区挂载（robot-mount-software），上述为当前激活槽；② 运行期数据（`/robot/persist` 日志/录包、`/robot/userdata`）不属于部署资源未计入；③ 每应用目录均自带 `aimrt_main/aimrte/iox-roudi` 三件套与 `*_pb_ts.so`（AimRT 插件），是 so 数量大的主因；④ 跨架构副本（aimrt_slam x86/arm、aprilgrid x86/arm）与多机型模型（mc 6 套）占部署空间约 40%，为「一套镜像适配多机型/研发调试」的代价。
+
+---
+
+> **本章数据存档**：动态采样原始日志（c2_rk_top/c2_rk_sys/c2_orin_top/c2_orin_tegra/c2_events/c2_markers + 进程与 cwd 快照）与分析脚本见仓库 `appendix-c-data/`；分析口径为阶段窗口均值，可按 markers 时间戳复算。
