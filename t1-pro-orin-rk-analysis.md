@@ -78,7 +78,7 @@
 | **内存** | `free -h` | 总 **7.7 GiB**（8GB 物理；颗粒类型未从板上确证，RK3576 支持 LPDDR4X/LPDDR5） | 总 **7.4 GiB**（8GB **LPDDR5 统一内存**，官方带宽 102.4 GB/s） |
 | **存储** | `lsblk -d -o NAME,SIZE,TYPE` | **eMMC 116.5 GB**（A/B 槽位分区即在其上） | **NVMe SSD 238.5 GB** + zram 交换 6×634 MB |
 | **功耗模式** | orin：`nvpmodel -q` | —（无该机制） | **NV Power Mode: 25W**（即 Orin Nano「Super」模式；实测静止整板 7.9 W，见 C.3.4） |
-| **网口速率** | `cat /sys/class/net/<if>/speed` | eth0 = **1000 Mb/s** | unused0 = **1000 Mb/s** |
+| **网口速率** | `cat /sys/class/net/<if>/speed`；拓扑看 `sudo dmesg \| grep yt9215` 与 `ip neigh` | eth0 = **1000 Mb/s**（GMAC 经 RGMII 接 YT9215RB 交换芯片） | unused0 = **1000 Mb/s**（接同一交换芯片） |
 | **CPU 同频 IPC** | 无板载测量命令 | 公开微架构资料近似值，见 §2.3 注 | 同左 |
 
 ### 2.2 CPU / NPU / GPU 硬件布局与分工（澄清：**NPU ≠ GPU**）
@@ -136,7 +136,9 @@ flowchart TB
 | AI 引擎实际使用（实测） | onnxruntime 1.19.2 **@CPU**（643 个 RL 策略，隔离核实时环）+ RKNN 2.3.2 **@NPU**（6 视觉模型） | TensorRT 10.7 **@GPU**（24 个 .engine） | 实测（C.1.3） |
 | 多媒体引擎 | MPP（4K 编解码）+ RGA 2.2 + ISP | NVDEC / NVENC / NVJPG / VIC / OFA（实测独立时钟 435–538 MHz） | 实测 |
 | 功耗模式 | —（无 nvpmodel） | `nvpmodel`：**25W Super 模式**（实测静止整板 7.9 W，C.3.4） | 实测 |
-| 以太网口 | 千兆 ×1（eth0，10.1.1.100） | 千兆 ×1（unused0，10.1.1.101） | 实测 |
+| 以太网口 | 千兆 GMAC ×1（eth0）——经 RGMII 接**裕太微 YT9215RB（5+2 口千兆交换芯片）** | 千兆 ×1（unused0，接到同一颗交换芯片） | 实测 dmesg/ARP + 芯片官方规格 |
+
+> **网口拓扑说明（2026-10-30 实测补充）**：整机**对外物理网口只有 1 个**（开发用 RJ45，见 §1.1），不是两块板各一个对外口。实测拓扑：rk 的千兆 GMAC（`rk_gmac-dwmac`）经 RGMII 接到 **Motorcomm/裕太微 YT9215RB——5+2 端口 10/100/1000M L2 交换芯片**（rk dmesg：`yt9215rb stmmac-1:00`；[裕太微官网产品页](https://www.motor-comm.com/product/switching-chip)），orin 的 `unused0` 与对外 RJ45 同接这颗交换芯片——因此 rk(10.1.1.100)/orin(10.1.1.101)/PC(10.1.1.99) 三者同处一个二层（两板 `ip neigh` 实测互见），与 §1.1「PC 直连内部以太网、不经 rk 路由」互证。交换芯片其余端口的用途（如坞座/扩展）远程无法确证。
 
 ### 2.4 ⚠️ rk 的 `nproc` 陷阱与隔离核（重点）
 
