@@ -63,18 +63,82 @@
 
 ---
 
-## 2. 硬件信息：查询命令与两板实测
+## 2. 硬件信息：查询命令与两板实测（2026-10-30 刷新扩充）
 
-### 2.1 三条命令对照表
+### 2.1 硬件查询命令对照表（整表刷新）
 
-| 查询项 | 命令 | t1pro_orin 实测 | t1pro_rk 实测 |
+| 查询项 | 命令 | rk（soc0）实测 | orin（soc1）实测 |
 |---|---|---|---|
-| **CPU 核数** | `nproc` | `6`（真实 6 核） | `6`（⚠️ 实际 8 核，见下） |
-| | `lscpu` | `CPU(s): 6`，`Model name: Cortex-A78AE`，每簇 3 核 ×2 | `CPU(s): 8`：**CPU0-3 = Cortex-A53（L2 簇 0，最高 2016 MHz）+ CPU4-7 = Cortex-A72（L2 簇 1，最高 2208 MHz）** |
-| **Ubuntu 版本** | `cat /etc/os-release \| grep PRETTY` | `PRETTY_NAME="Ubuntu 22.04.5 LTS"` | `PRETTY_NAME="Ubuntu 22.04.5 LTS"` |
-| **GPU 型号** | orin：`nvidia-smi --query-gpu=name,driver_version --format=csv`；rk：无 nvidia-smi，用 `ls /dev/dri/` + dmesg/设备树佐证 | `Orin (nvgpu)`，driver `540.4.0`（Jetson Orin Nano Super 集成 Ampere GPU；`/proc/device-tree/model` = Orin Nano 开发套件 Super） | SoC 集成 **ARM Mali-G52 MC3**（rk3576 Datasheet 口径）；实机证据：`/dev/dri/card0、card1、renderD128、renderD129` + 内核 `kbase_*` 线程（Mali kbase 驱动）；`/sys/kernel/debug/mali/version` 未挂载，GPU 型号字符串无法从 sysfs 直接读出 |
+| **CPU 核数 / 微架构** | `nproc` / `lscpu` / `cat /proc/cpuinfo` | `nproc`=`6`⚠️（实际 8 核，见 §2.4）；lscpu：CPU0-3 = **Cortex-A53**、CPU4-7 = **Cortex-A72** | `nproc`=`6`；`Model name: ARMv8 Processor rev 1`；lscpu：**Cortex-A78AE**（每簇 3 核 ×2） |
+| **CPU 最高频率（实测）** | `cat /sys/devices/system/cpu/cpufreq/policy*/cpuinfo_max_freq`（orin 单核路径 `cpu0/cpufreq/…`） | A53 簇（policy0，核 0-3）**2016 MHz**；A72 簇（policy4，核 4-7）**2208 MHz** | `cpuinfo_max_freq` = **1728 MHz**；`scaling_max_freq` = 1344 MHz（当前调度上限；tegrastats 实测运行 @1344 MHz） |
+| **Ubuntu / 固件基线** | `cat /etc/os-release`；rk：`cat /proc/device-tree/model`；orin：`head -1 /etc/nv_tegra_release` | Ubuntu 22.04.5；设备树 `primebot rockchip rk3576 t2-3` | Ubuntu 22.04.5；L4T **R36.4.4**（JetPack 6.2） |
+| **GPU 型号** | orin：`nvidia-smi --query-gpu=name,driver_version --format=csv`；rk：无 nvidia-smi → `ls /dev/dri/` + 内核线程佐证 | SoC 集成 **ARM Mali-G52 MC3**（图形 GPU）；证据：`/dev/dri/card0、card1、renderD128、renderD129` + 内核 `kbase_*` 线程（Mali 驱动）；型号字符串无法从 sysfs 直读 | `Orin (nvgpu)`，driver **540.4.0**（Orin Nano 开发套件 Super，集成 Ampere GPU） |
+| **GPU 频率 / 利用率** | `cat /sys/class/devfreq/*gpu*/{cur,max}_freq` 与 `load`；orin 另用 `tegrastats` | devfreq `27800000.gpu`：300–**900 MHz**（实测运行 800–900 MHz；利用率见附录 C.3） | devfreq `17000000.gpu`：306–**918 MHz**（动态调频；另有 NVDEC/NVJPG/VIC/OFA 独立时钟 435–538 MHz） |
+| **NPU（仅 rk 有）** | rk：`sudo cat /sys/kernel/debug/rknpu/load`、`…/version`、`…/freq`；orin 无 NPU | **RKNPU driver v0.9.8**；双核 `Core0/Core1 xx%`；频率 **950 MHz** | —（AI 由 GPU 承担，`tegrastats` 的 `GR3D_FREQ` 看利用率） |
+| **内存** | `free -h` | 总 **7.7 GiB**（8GB 物理；颗粒类型未从板上确证，RK3576 支持 LPDDR4X/LPDDR5） | 总 **7.4 GiB**（8GB **LPDDR5 统一内存**，官方带宽 102.4 GB/s） |
+| **存储** | `lsblk -d -o NAME,SIZE,TYPE` | **eMMC 116.5 GB**（A/B 槽位分区即在其上） | **NVMe SSD 238.5 GB** + zram 交换 6×634 MB |
+| **功耗模式** | orin：`nvpmodel -q` | —（无该机制） | **NV Power Mode: 25W**（即 Orin Nano「Super」模式；实测静止整板 7.9 W，见 C.3.4） |
+| **网口速率** | `cat /sys/class/net/<if>/speed` | eth0 = **1000 Mb/s** | unused0 = **1000 Mb/s** |
+| **CPU 同频 IPC** | 无板载测量命令 | 公开微架构资料近似值，见 §2.3 注 | 同左 |
 
-### 2.2 ⚠️ rk 的 `nproc` 陷阱与隔离核（重点）
+### 2.2 CPU / NPU / GPU 硬件布局与分工（澄清：**NPU ≠ GPU**）
+
+**先回答一个关键问题：rk 板的「NPU」就是 GPU 吗？——不是，它们是 SoC 内两个互不相干的独立硬件。**
+
+- **NPU（Network Processing Unit，神经网络加速器）**：rk3576 内置的**INT8 矩阵乘专用加速器**（6 TOPS、双核、950 MHz，内核驱动 RKNPU v0.9.8）。它只为神经网络推理而生，rk 上**只被 Agent 使用**——6 个视觉模型（人脸/手势/姿态/ReID）经 RKNN Runtime 2.3.2 部署其上（附录 C.1.3）。
+- **GPU（Mali-G52 MC3，图形处理器）**：只负责**图形渲染**——胸屏 flutter UI/表情动画（flutter-pi 持有 GPU 设备）。它**不做任何 AI 推理**，也没有 nvidia-smi（那是 NVIDIA 专属工具，rk 上「没有 GPU」的说法实际指的是没有 NVIDIA 计算卡/nvidia-smi）。
+- **rk 的 AI 推理 = CPU + NPU 分工**：RL 运动策略走 **CPU**（onnxruntime 1.19.2，跑在隔离核 CPU3 的实时环里）；视觉模型走 **NPU**（RKNN）；语音前端（VAD/AEC/KWS）走 CPU。GPU 完全不参与 AI。
+- **orin 正好相反：AI = GPU**。Orin Nano 无独立 NPU、无 DLA，全部 24 个 `.engine` 模型由 **Ampere GPU**（1024 CUDA 核心 + 32 Tensor Core，TensorRT 10.7 / CUDA 12.6）推理；GPU 在这块板上既是「显卡」（可接显示）也是「AI 计算卡」。
+- 两板同为**统一内存（UMA）架构**：CPU/GPU/NPU 共享同一池 DDR，**没有独立显存**——这就是附录 C.3 中「GPU 显存无独立数值」的硬件根源。
+
+```mermaid
+flowchart TB
+    subgraph RK3576["🖥 rk3576 SoC（瑞芯微 · 统一内存）——AI = CPU + NPU，GPU 只做图形"]
+        RK_CPU0["CPU 簇 0：4× Cortex-A53 ≤2016MHz<br/>（CPU2=CAN 硬中断 · CPU3=MC 独占，见 §2.4）"]
+        RK_CPU1["CPU 簇 1：4× Cortex-A72 ≤2208MHz<br/>（全部业务栈跑 CPU0/1/4-7）"]
+        RK_GPU["Mali-G52 MC3 图形 GPU<br/>300–900MHz（仅胸屏/UI 渲染，非 AI）"]
+        RK_NPU["NPU：6 TOPS INT8 · 双核 @950MHz<br/>（RKNN · Agent 视觉 6 模型专用）"]
+        RK_MM["多媒体块：MPP 4K 编解码 · RGA 2.2 · ISP"]
+        RK_DDR["统一 DDR 8GB<br/>（CPU/GPU/NPU 共享，无独立显存）"]
+    end
+    subgraph ORIN_SOC["🧠 Jetson Orin Nano Super SoC（NVIDIA · 统一内存）——AI = GPU"]
+        O_CPU["6× Cortex-A78AE ≤1728MHz<br/>（@25W 模式调度上限 1344MHz）"]
+        O_GPU["Ampere GPU：1024 CUDA + 32 Tensor Core<br/>306–918MHz（TensorRT 10.7 / CUDA 12.6，全部 .engine 推理）"]
+        O_MM["多媒体引擎：NVDEC/NVENC/NVJPG/VIC/OFA<br/>（独立时钟 435–538MHz）"]
+        O_DDR["统一 LPDDR5 8GB · 102.4GB/s<br/>（CPU/GPU 共享，无独立显存）"]
+    end
+    RK_CPU0 & RK_CPU1 & RK_GPU & RK_NPU & RK_MM --- RK_DDR
+    O_CPU & O_GPU & O_MM --- O_DDR
+```
+
+> 分工速记：**rk = CPU（RL 策略/语音）+ NPU（视觉）+ GPU（胸屏渲染）三路各司其职；orin = CPU（调度/融合/导航）+ GPU（感知推理）两路**。推理框架与模型的对应关系见附录 C.1.3。
+
+### 2.3 两板硬件规格总表
+
+> 「实测」= 板上命令直接读出；「公开」= 厂商Datasheet/官方口径；IPC 为公开微架构资料近似值（无板载测量手段）。
+
+| 规格项 | rk3576（运控板 soc0） | Jetson Orin Nano Super（大脑板 soc1） | 来源 |
+|---|---|---|---|
+| CPU 核心 IP 设计 | ARM **Cortex-A53**（小核）+ ARM **Cortex-A72**（大核） | ARM **Cortex-A78AE**（A78 嵌入式/自驾变体） | ARM IP |
+| SoC 集成设计厂家 | **瑞芯微 Rockchip** | **NVIDIA** | — |
+| 工艺 | 8 nm（RK3576 公开口径） | 8 nm（Samsung 8LPP，Orin 系公开口径） | 公开 |
+| CPU 核心数 | **8**（4×A53 + 4×A72，big.LITTLE；CPU2/3 隔离，见 §2.4） | **6**（同构） | 实测 |
+| CPU 微架构 | A53：顺序、双发射；A72：乱序、3 宽 | A78AE：乱序、宽发射（≈A78） | 公开 |
+| CPU 频率（实测） | A53 ≤**2016 MHz**、A72 ≤**2208 MHz** | ≤**1728 MHz**（25W 模式调度上限实测 1344 MHz） | 实测 cpufreq |
+| CPU 同频 IPC（整数） | A53 ≈ **2.1**、A72 ≈ **3.2**（同频整数吞吐 A72 ≈ 1.5×A53） | A78AE ≈ **4.6**（≈ 2.2×A53） | 公开微架构资料近似（无法板载实测） |
+| GPU | ARM **Mali-G52 MC3**（Bifrost 三核，图形定位） | NVIDIA **Ampere**：1024 CUDA 核心 + 32 Tensor Core | 实测+公开 |
+| GPU 频率（实测） | 300–900 MHz（devfreq） | 306–918 MHz（devfreq，动态） | 实测 |
+| GPU 算力 | FP32 ≈ 0.05–0.1 TFLOPS 级（按 G52 MC3 3 核 × 900 MHz 估算，ARM 未公布官方 FLOPS；**不用于 AI**） | FP32 ≈ **2.1 TFLOPS**；INT8 稀疏 **67 TOPS**（25W Super 模式官方口径，含 Tensor Core） | orin 官方；rk 为注明口径的估算 |
+| GPU 显存 | **无独立显存**——统一内存（与 CPU/NPU 共享 8GB） | **无独立显存**——统一 LPDDR5 8GB（102.4 GB/s） | 架构事实 |
+| NPU 算力 | **6 TOPS INT8**（双核 @950 MHz，RKNPU v0.9.8；实测仅 Agent 视觉使用） | **无独立 NPU/DLA**（AI 全在 GPU Tensor Core） | 实测+公开 |
+| 内存 | **8 GB**（free 7.7 GiB；颗粒类型 LPDDR4X/LPDDR5 待确证） | **8 GB LPDDR5** 统一内存（102.4 GB/s） | 实测+公开 |
+| 存储（实测） | **eMMC 116.5 GB**（A/B 双槽分区，robot-mount 按 slot 挂载） | **NVMe SSD 238.5 GB** + zram 交换 3.7 GB | 实测 lsblk |
+| AI 引擎实际使用（实测） | onnxruntime 1.19.2 **@CPU**（643 个 RL 策略，隔离核实时环）+ RKNN 2.3.2 **@NPU**（6 视觉模型） | TensorRT 10.7 **@GPU**（24 个 .engine） | 实测（C.1.3） |
+| 多媒体引擎 | MPP（4K 编解码）+ RGA 2.2 + ISP | NVDEC / NVENC / NVJPG / VIC / OFA（实测独立时钟 435–538 MHz） | 实测 |
+| 功耗模式 | —（无 nvpmodel） | `nvpmodel`：**25W Super 模式**（实测静止整板 7.9 W，C.3.4） | 实测 |
+| 以太网口 | 千兆 ×1（eth0，10.1.1.100） | 千兆 ×1（unused0，10.1.1.101） | 实测 |
+
+### 2.4 ⚠️ rk 的 `nproc` 陷阱与隔离核（重点）
 
 rk 内核启动参数做了 CPU 隔离（`/sys/devices/system/cpu/isolated` = **`2-3`**）：
 
@@ -179,7 +243,7 @@ systemd
 
 ### 3.4 隔离核专享进程（rk）小结
 
-见 §2.2 表：**CPU2 = CAN0/CAN1 硬中断 + rk_timer/arm-pmu；CPU3 = `mc_app_main` 运动控制独占（36 线程全钉 CPU3）**。除隔离核外，rk 其余进程亲和性一律 `0,1,4-7`；orin 无隔离核。
+见 §2.4 表：**CPU2 = CAN0/CAN1 硬中断 + rk_timer/arm-pmu；CPU3 = `mc_app_main` 运动控制独占（36 线程全钉 CPU3）**。除隔离核外，rk 其余进程亲和性一律 `0,1,4-7`；orin 无隔离核。
 
 
 ---
@@ -1175,7 +1239,7 @@ flowchart LR
 | 推理框架 | 版本（实测） | 运行位置 | 承载模型 | 开源仓 |
 |---|---|---|---|---|
 | onnxruntime | **1.19.2** | rk CPU（mc 独占核 CPU3 实时环 + Agent CPU） | mc 全部 RL 策略（643×onnx）、silero VAD | github.com/microsoft/onnxruntime |
-| RKNN Runtime | **2.3.2** | rk **NPU**（双核，实测基线占用 Core0 ~30%） | Agent 六个视觉模型（face/gesture/hand/pose/reid） | github.com/airockchip/rknn-toolkit2（工具链） |
+| RKNN Runtime | **2.3.2** | rk **NPU**（双核，实测静止基线占用 Core0 ~26%） | Agent 六个视觉模型（face/gesture/hand/pose/reid） | github.com/airockchip/rknn-toolkit2（工具链） |
 | MNN | ≈3.5.0（strings 提取） | rk CPU | DTLN AEC ×2 | github.com/alibaba/MNN |
 | sherpa-onnx | **1.12.15** | rk CPU | KWS 唤醒 | github.com/k2-fsa/sherpa-onnx |
 | TensorRT + CUDA 12.6 + cuDNN 9.3 | **10.7.0.23** | orin GPU（Ampere） | 全部 orin `.engine`（24 个） | NVIDIA（闭源、公开分发） |
@@ -1247,7 +1311,7 @@ flowchart LR
 读图要点（实测佐证）：
 1. **语义往返 ~62s**：语音指令到首个动作（起身）间隔 62s，为云端 LLM 会话（含意图判定与话术生成）+ 任务仲裁链路的总时延；本地链路（Agent→TE→MC）毫秒级。
 2. **跳舞本体是 RL 策略**：`QUADRUPED_LOCOMOTION_DANCE(109)` 映射 `rl/quad_walk_dance.yaml`→onnxruntime 在隔离核 CPU3 实时推理（动作库含 `douyin_3500`、`q1_danceGo`、`q1_ladingwu2` 等多种舞曲策略，另有 CSV 轨迹模仿舞 `BIPED_MIMIC_DANCE_*`）。
-3. **多模态反馈同步**：TTS（云端 opus→audio_manager 播放）、胸屏表情（PlayEmotion）、灯带灯语（LedStripCommand + lumina 联动）与动作并行下发——UC1 期间 display_ui CPU 12%→28%、audio_manager 微升、agent 108%→128%（见 C.3）。
+3. **多模态反馈同步**：TTS（云端 opus→audio_manager 播放）、胸屏表情（PlayEmotion）、灯带灯语（LedStripCommand + lumina 联动）与动作并行下发——UC1 期间 display_ui CPU 9.1%→28.5%（表情渲染约 3 倍）、audio_manager 2.4%→3.0% 微升、agent 104.3%→128.5%（基线为快照重测值，见 C.3）。
 4. **前置姿态处理**：机器人当时趴卧，TE 先经 SetMcAction 起身到四足站立（whole_body 规则 `block_posture: LYING_DEFAULT…` 趴卧禁止直接跳全身舞），舞毕自主 `QUADRUPED_TO_BIPED_ROTATE` 转双足站立收势。
 
 #### C.2.2 UC2 姿态切换「趴下 → 四足站立」
@@ -1304,7 +1368,7 @@ flowchart LR
 1. **双路径设计**：实线 = 视觉跟随路径（person_track 检测+ReID → follow_candidates★ → follow_node 语义规划 → `velocity`→MC 按 `SetMcInputSource` 仲裁），虚线标注本例实际状态——**跟随任务已启动但全程 `follow/state=1 未发现目标`**（牵手位置遮挡相机视角），未产生跟随速度指令。
 2. **实际生效机制 = 牵手带步**：MC 通过关节电流/力矩实时估计 `McHandHeldState`（UNKNOWN/BOTH_NOT_HELD/LEFT_HELD_ONLY/RIGHT_HELD_ONLY/BOTH_HELD + `is_held`），牵手后机器人先自主变形双足（实测 `QUADRUPED_TO_BIPED_ROTATE(11)`→`BIPED_LOCOMOTION_WBC(300)`），在 WBC 全身控制下以力导引随人迈步——**该路径不经 `velocity` 话题，完全在 MC 实时层闭环**。
 3. **held_state 的反向作用**：任务规则层以 `allow_held_state: false` 门控姿态切换/示教/遥控等 8 类任务（牵手时拒绝），即牵手既是控制输入也是任务态约束。
-4. **资源侧证据**：UC3 期间 orin `follow_node` 0.1%→10.4%、`percep` 9.3%→23.9%、`nav2_stack` 1.7%→14.1%（目标搜索与规划激活），rk `task_engine` 19%→31.6%、`legged_odom` 36%→43%（行走中里程计满负荷），见 C.3。
+4. **资源侧证据**：UC3 期间 orin `follow_node` 0.2%→10.4%、`percep` 9.0%→23.9%、nav2 组件容器 5.0%→14.1%（目标搜索与规划激活），rk `task_engine` 17.7%→31.6%、`legged_odom` 37.5%→43.0%（行走中里程计满负荷）；基线为快照重测值、UC 列为连续采样口径（见 C.3）。
 
 #### C.2.4 三 usecase 涉及的节点 / Topic / Service 明细表（与上图逐条对应）
 
@@ -1350,7 +1414,7 @@ flowchart LR
 
 ### C.3 三个 usecase 下的运行资源占用（实测）
 
-> **方法与口径**：① 进程 CPU/内存 = 两板 `top -b -d 3 -w 220` 全进程快照（16 分钟连续采样，按 C.2.0 阶段窗口取均值；`%CPU` 为区间瞬时值，100%=单核，>100%=多核）；② rk GPU=devfreq `*gpu*/load`（Mali-G52），NPU=debugfs `rknpu/load`（双核）；③ orin GPU=`tegrastats GR3D_FREQ`、功耗=`VDD_IN`；④ 进程→模块归属按 `/robot/software/<app>`（cwd+args 双重判定）；⑤ 板级 busy 含采样器自身开销（全进程 top 轮询约占数个百分点，进程表已剔除采样器进程）。
+> **方法与口径**：① **BASE 基线 = 低开销离散快照法重测**（2026-10-30 17:44–17:50，机器人静止、开机 37 分钟：12 轮 × 30s，每轮仅一次 `top -b -n 2 -d 5` 取第 2 帧 5s 瞬时值 + GPU/NPU/内存一行，轮间 20s 完全静默）；**UC1–UC3 列沿用连续采样法**（`top -b -d 3 -w 220` + 5 路 `ros2 topic echo` 订阅，随场景 16 分钟）。**两法实测差异即采样器自身开销**：orin 板级 busy 高估约 **+40pp**（67.8%→26.7%）、GR3D +9pp、RAM +350MiB（echo 进程驻留）、功耗 +1.3W；rk 板级仅 +2.6pp（74.8%→72.2%）——**rk 常态高负载是真实情况，orin 基线则被上轮采样显著抬高**。进程级数值两法一致（采样器进程均已剔除）；**跨阶段对比以进程级列与相对变化为准，UC 列的板级绝对值含该恒定开销**。② rk GPU=devfreq `*gpu*/load`（Mali-G52），NPU=debugfs `rknpu/load`（双核）；③ orin GPU=`tegrastats GR3D_FREQ`、功耗=`VDD_IN`；④ 进程→模块归属按 `/robot/software/<app>`（cwd+args 双重判定）。
 > **GPU「显存」口径**：两板均为**统一内存**架构（Jetson UMA / rk3576 CPU-GPU 共享 DDR），无独立显存统计——GPU/NPU 使用的内存就是进程 RSS 与整机内存里的同一池（orin `cudaMalloc`、rk NPU `dma_buf` 均从统一内存分配）。
 > 阶段窗口：BASE=101s 静止基线；UC1=对话+跳舞；UC2a=趴下；UC2b=四足站立；UC3=牵手跟随带步（含任务启动与行走）。
 
@@ -1366,39 +1430,41 @@ flowchart LR
 
 #### C.3.1 rk 板：软件模块/进程级（CPU 占用% × 5 阶段；内存 RSS；GPU/NPU 归因）
 
+> 基线列为 2026-10-30 17:44 低开销快照重测值；UC1–UC3 为连续采样值。mc/device_manager 读数与机器人姿态/状态相关（上轮基线为趴卧态且叠加连续采样，本次为静止态快照），故 realtime 类数值下调属口径修正。
+
 | 进程（模块） | 所属 slice | CPU% 基线 | CPU% UC1跳舞 | CPU% UC2a趴下 | CPU% UC2b站立 | CPU% UC3牵手 | 内存 RSS(MB) | GPU/NPU 归因 |
 |---|---|---|---|---|---|---|---|---|
-| **aimrt_agent**（Agent 对话智能体+语音前端+NPU 视觉） | interaction | 107.6 | **128.5** | 107.4 | 117.3 | 101.2 | **1434** | **NPU 独占**（6 个视觉模型，模型常驻即内存主项之一）+ CPU 推理（VAD/AEC/KWS） |
-| **mc**（MC 运动控制 · CPU3 独占 · RL 实时推理） | realtime | 75.4 | 74.3 | 76.5 | 74.5 | 77.1 | 253 | 纯 CPU（onnxruntime @CPU3，无 GPU/NPU） |
-| device_manager（设备管理） | realtime | 62.7 | 59.2 | 61.1 | 60.6 | 57.9 | 45 | — |
-| legged_odom（足式里程计） | system | 36.4 | 42.2 | 39.1 | 41.9 | **43.0** | 62 | — |
-| drp（rosbag 持续录包） | system | 34.9 | 32.3 | 33.3 | 33.0 | 31.2 | 66 | — |
-| app_proxy（App 状态镜像 29 路订阅） | system | 29.9 | 30.5 | 30.2 | 30.1 | 30.3 | 124 | — |
-| **task_engine**（任务引擎） | interaction | 19.0 | 27.5 | 24.7 | 26.8 | **31.6** | 84 | — |
-| display_ui（flutter-pi 胸屏渲染） | interaction | 12.2 | **28.5** | 21.3 | 29.7 | 28.2 | 226 | **Mali GPU**（胸屏 2D/3D 渲染，rk GPU 占用主项） |
-| hal_camera（rk 侧相机 HAL） | system | 14.2 | 15.0 | 14.6 | 15.1 | 14.8 | 446 | MPP/RGA 硬件通路（VPU/RGA，非 GPU） |
-| lumina（灯效服务） | system | 11.3 | 12.0 | 12.3 | 12.2 | 13.2 | 92 | — |
-| hal_rgbd（rk 侧 ToF/RGBD HAL 实例①） | system | 9.4 | 10.2 | 9.8 | 10.1 | 10.0 | 40 | — |
-| rc（体感遥控接入） | system | 6.6 | 7.0 | 6.8 | 7.1 | 6.8 | 50 | — |
-| ota（ota_master） | system | 5.1 | 5.2 | 5.2 | 5.2 | 5.1 | 63 | — |
-| cloud_proxy（云端代理） | system | 5.0 | 4.9 | 5.0 | 5.0 | 4.9 | 351 | — |
-| insta360（云台接入） | system | 3.9 | 4.0 | 4.0 | 3.9 | 3.9 | 43 | — |
+| **aimrt_agent**（Agent 对话智能体+语音前端+NPU 视觉） | interaction | 104.3 | **128.5** | 107.4 | 117.3 | 101.2 | **1229** | **NPU 独占**（6 个视觉模型，模型常驻即内存主项之一）+ CPU 推理（VAD/AEC/KWS） |
+| **mc**（MC 运动控制 · CPU3 独占 · RL 实时推理） | realtime | 43.4 | 74.3 | 76.5 | 74.5 | 77.1 | 252 | 纯 CPU（onnxruntime @CPU3，无 GPU/NPU） |
+| device_manager（设备管理） | realtime | 47.1 | 59.2 | 61.1 | 60.6 | 57.9 | 44 | — |
+| legged_odom（足式里程计） | system | 37.5 | 42.2 | 39.1 | 41.9 | **43.0** | 64 | — |
+| drp（rosbag 持续录包） | system | 28.7 | 32.3 | 33.3 | 33.0 | 31.2 | 70 | — |
+| app_proxy（App 状态镜像 29 路订阅） | system | 28.7 | 30.5 | 30.2 | 30.1 | 30.3 | 123 | — |
+| **task_engine**（任务引擎） | interaction | 17.7 | 27.5 | 24.7 | 26.8 | **31.6** | 87 | — |
+| display_ui（flutter-pi 胸屏渲染） | interaction | 9.1 | **28.5** | 21.3 | 29.7 | 28.2 | 225 | **Mali GPU**（胸屏 2D/3D 渲染，rk GPU 占用主项） |
+| hal_camera（rk 侧相机 HAL） | system | 13.3 | 15.0 | 14.6 | 15.1 | 14.8 | 451 | MPP/RGA 硬件通路（VPU/RGA，非 GPU） |
+| lumina（灯效服务） | system | 10.9 | 12.0 | 12.3 | 12.2 | 13.2 | 92 | — |
+| hal_rgbd（rk 侧 ToF/RGBD HAL 实例①） | system | 9.0 | 10.2 | 9.8 | 10.1 | 10.0 | 40 | — |
+| rc（体感遥控接入） | system | 6.2 | 7.0 | 6.8 | 7.1 | 6.8 | 52 | — |
+| ota（ota_master） | system | 4.8 | 5.2 | 5.2 | 5.2 | 5.1 | 68 | — |
+| cloud_proxy（云端代理） | system | 4.8 | 4.9 | 5.0 | 5.0 | 4.9 | 665④ | — |
+| insta360（云台接入） | system | 3.6 | 4.0 | 4.0 | 3.9 | 3.9 | 44 | — |
 | hal_sensor（HAL soc0：BMS/灯/舵机） | system | 3.4 | 3.6 | 3.5 | 3.6 | 3.5 | 74 | — |
-| housekeeper（管家） | system | 3.1 | 3.4 | 3.0 | 3.1 | 3.1 | 132 | — |
+| housekeeper（管家） | system | 3.1 | 3.4 | 3.0 | 3.1 | 3.1 | 131 | — |
 | abox（日志） | system | 2.9 | 3.0 | 3.0 | 3.1 | 3.0 | 75 | — |
-| sm（状态机） | system | 2.9 | 3.0 | 2.9 | 3.0 | 2.9 | 57 | — |
-| audio_manager（音频管理/播放） | interaction | 2.5 | 3.0 | 2.7 | 2.7 | 2.7 | 59 | — |
-| hds（健康诊断） | system | 2.3 | 2.4 | 2.3 | 2.3 | 2.4 | 53 | — |
+| sm（状态机） | system | 2.8 | 3.0 | 2.9 | 3.0 | 2.9 | 61 | — |
+| audio_manager（音频管理/播放） | interaction | 2.4 | 3.0 | 2.7 | 2.7 | 2.7 | 58 | — |
+| hds（健康诊断） | system | 2.3 | 2.4 | 2.3 | 2.3 | 2.4 | 54 | — |
 | pipewire_audio（PipeWire 音频服务） | 系统 | 1.0 | 2.3 | 1.5 | 2.1 | 2.2 | 78 | — |
-| connx（圈圈 quanji_uwb 接入②） | system | 1.6 | 1.7 | 1.7 | 1.6 | 1.7 | 73 | — |
-| sys_guard（场景看护） | system | 1.0 | 1.9 | 1.2 | 1.6 | 1.2 | 48 | — |
+| connx（圈圈 quanji_uwb 接入②） | system | 1.5 | 1.7 | 1.7 | 1.6 | 1.7 | 74 | — |
+| sys_guard（场景看护） | system | 0.9 | 1.9 | 1.2 | 1.6 | 1.2 | 50 | — |
 | scene_engine（场景引擎） | system | 1.2 | 1.2 | 1.3 | 1.3 | 1.3 | 41 | — |
-| data_exporter | auxiliary | 0.7 | 0.8 | 0.7 | 0.8 | 0.7 | 56 | — |
-| resource_manager（picture_service） | system | 0.7 | 0.7 | 0.7 | 0.7 | 0.7 | 54 | — |
-| mosquitto（conduit_router TLS） | 系统 | 0.6 | 0.5 | 0.5 | 0.5 | 0.5 | 12 | — |
-| rtsp_server | system | 0.2 | 0.2 | 0.2 | 0.2 | 0.2 | 121 | MPP 硬编码（VPU） |
+| data_exporter | auxiliary | 0.6 | 0.8 | 0.7 | 0.8 | 0.7 | 60 | — |
+| resource_manager（picture_service） | system | 0.5 | 0.7 | 0.7 | 0.7 | 0.7 | 56 | — |
+| mosquitto（conduit_router TLS） | 系统 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 13 | — |
+| rtsp_server | system | 0.2 | 0.2 | 0.2 | 0.2 | 0.2 | 126 | MPP 硬编码（VPU） |
 | iox-roudi（iceoryx 共享内存总线③） | 系统 | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 794 | — |
-| process_manager | 系统 | 0.6 | 0.7 | 0.7 | 0.7 | 0.7 | 43 | — |
+| process_manager | 系统 | 0.5 | 0.7 | 0.7 | 0.7 | 0.7 | 46 | — |
 | 其他（ptp4l/hostapd/dnsmasq/chronyd/NetworkManager/secret_store 等） | 系统 | 各 <1 | | | | | ~120 合计 | — |
 
 ① rk 侧亦部署 hal_rgbd 实例（soc0 manifest stage1 实含，§3.2 表未列，本次实测补录）。② 圈圈接入进程位于 connx 应用目录（`aimrt_main --cfg=quanji.yaml`）。③ RSS 主要为 iceoryx 共享内存段映射（全板共享），非私有内存。
@@ -1407,22 +1473,22 @@ flowchart LR
 
 | 进程（模块） | CPU% 基线 | CPU% UC1跳舞 | CPU% UC2a趴下 | CPU% UC2b站立 | CPU% UC3牵手 | 内存 RSS(MB) | GPU 归因 |
 |---|---|---|---|---|---|---|---|
-| hal_camera（相机 HAL：双目/鱼眼/彩色+头部 IMU） | 40.7 | 40.6 | 41.4 | 41.5 | 41.5 | **707** | 持有 GPU 设备（图像处理/上传，RSS 含 CUDA 缓冲） |
-| hal_rgbd（5 目 ToF HAL） | 38.9 | 38.8 | 38.9 | 38.9 | 38.7 | 344 | —（点云走 CPU/ISP） |
-| nav2_perception（点云合并+perception_node） | 17.0 | 18.6 | 18.5 | 19.0 | 19.5 | 100 | — |
-| **percep（感知算法：分割/深度/检测）** | 9.3 | 18.7 | 15.9 | 15.3 | **23.9** | 322 | **GR3D（TensorRT 推理，GPU 算力主项之一）** |
-| coreon_fusion（多源融合 27 路输入） | 5.3 | 7.6 | 7.0 | 7.2 | 8.7 | 355 | —（融合走 CPU） |
-| person_track（人体跟踪+ReID） | 3.8 | 4.5 | 4.3 | 4.4 | 5.1 | 279 | **GR3D（yolov8s-seg + clip_reid/swin ReID）** |
-| **nav2 栈组件容器**（bt_navigator/controller/planner/behavior/smoother/map_server/双层 costmap）① | 1.7 | 9.8 | 7.3 | 8.6 | **14.1** | 117 | —（规划走 CPU） |
-| follow（follow_node+launch，语义跟随规划） | 0.1 | 5.5 | 3.8 | 4.5 | **10.4** | 144 | — |
-| brightness（亮度检测） | 1.8 | 2.0 | 1.9 | 2.0 | 2.2 | 37 | — |
-| path_follow（trajectory_tracker 运镜） | 1.0 | 1.8 | 1.6 | 1.7 | 2.3 | 36 | — |
-| hal_sensor（soc1：ADU/温度） | 1.5 | 1.5 | 1.5 | 1.5 | 1.5 | 38 | — |
-| nav2_lifecycle_manager（t1_perception） | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 35 | — |
-| nav2 launch（ros2 launch python） | 0.4 | 0.4 | 0.4 | 0.4 | 0.4 | 76 | — |
-| process_manager（soc1 实例） | 0.4 | 0.4 | 0.4 | 0.4 | 0.4 | 173 | — |
-| sys_guard / ota_slave / data_exporter | 0.8 / 0.8 / 0.6 | → 微升 | → | → | → | 51 / 60 / 61 | — |
-| iox-roudi（共享内存总线②） | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 850 | — |
+| hal_camera（相机 HAL：双目/鱼眼/彩色+头部 IMU） | 42.6 | 40.6 | 41.4 | 41.5 | 41.5 | **693** | 持有 GPU 设备（图像处理/上传，RSS 含 CUDA 缓冲） |
+| hal_rgbd（5 目 ToF HAL） | 38.3 | 38.8 | 38.9 | 38.9 | 38.7 | 356 | —（点云走 CPU/ISP） |
+| nav2_perception（点云合并+perception_node） | 16.9 | 18.6 | 18.5 | 19.0 | 19.5 | 97 | — |
+| **percep（感知算法：分割/深度/检测）** | 9.0 | 18.7 | 15.9 | 15.3 | **23.9** | 342 | **GR3D（TensorRT 推理，GPU 算力主项之一）** |
+| coreon_fusion（多源融合 27 路输入） | 5.4 | 7.6 | 7.0 | 7.2 | 8.7 | 391 | —（融合走 CPU） |
+| person_track（人体跟踪+ReID） | 3.3 | 4.5 | 4.3 | 4.4 | 5.1 | 311 | **GR3D（yolov8s-seg + clip_reid/swin ReID）** |
+| **nav2 栈组件容器**（bt_navigator/controller/planner/behavior/smoother/map_server/双层 costmap）① | 5.0 | 9.8 | 7.3 | 8.6 | **14.1** | 114 | —（规划走 CPU） |
+| follow（follow_node+launch，语义跟随规划） | 0.2 | 5.5 | 3.8 | 4.5 | **10.4** | 122 | — |
+| brightness（亮度检测） | 1.4 | 2.0 | 1.9 | 2.0 | 2.2 | 38 | — |
+| path_follow（trajectory_tracker 运镜） | 1.0 | 1.8 | 1.6 | 1.7 | 2.3 | 34 | — |
+| hal_sensor（soc1：ADU/温度） | 1.4 | 1.5 | 1.5 | 1.5 | 1.5 | 42 | — |
+| nav2_lifecycle_manager（t1_perception） | 1.2 | 1.0 | 1.0 | 1.0 | 1.0 | 35 | — |
+| nav2 launch（ros2 launch python） | 0.3 | 0.4 | 0.4 | 0.4 | 0.4 | 80 | — |
+| process_manager（soc1 实例） | 0.4 | 0.4 | 0.4 | 0.4 | 0.4 | 175 | — |
+| sys_guard / ota_slave / data_exporter | 0.8 / 0.7 / 0.5 | → 微升 | → | → | → | 56 / 65 / 72 | — |
+| iox-roudi（共享内存总线②） | 0.2 | 0.1 | 0.1 | 0.1 | 0.1 | 850 | — |
 | 其他（ptp4l/NM/tetherd 等） | 各 <1 | | | | | ~20 | — |
 
 ① Nav2 生命周期节点以组件容器（component_container_mt，节点名 nav2_container）组合运行，仅 perception 链/lifecycle 独立进程——与 §3.3 进程表一致。② 同 rk 注③。
@@ -1431,27 +1497,31 @@ flowchart LR
 
 | 子系统（slice） | 成员 | CPU% 基线 | CPU% UC1跳舞 | CPU% UC2a趴下 | CPU% UC2b站立 | CPU% UC3牵手 | 内存 RSS(MB) |
 |---|---|---|---|---|---|---|---|
-| rk `robot_realtime.slice`（CPUWeight 10000 · MemoryMin 500MB） | mc + device_manager | 138.1 | 133.5 | 137.6 | 135.2 | 135.0 | 297 |
-| rk `robot_interaction.slice`（CPUWeight 3000） | agent + display_ui + audio_manager + task_engine | 141.2 | **187.6** | 156.0 | 176.5 | 163.6 | 1802 |
-| rk `robot_auxiliary.slice`（CPUWeight 500 · **CPUQuota 40%**） | data_exporter | 0.7 | 0.8 | 0.7 | 0.8 | 0.7 | 56 |
-| rk `robot_system.slice` + 系统服务（CPUWeight 5000/10000） | 其余全部业务 + iox-roudi/音频/网络等基座 | 181.9 | 192.8 | 187.8 | 191.4 | 190.0 | —（含 iox 794 共享） |
-| orin 全部业务（robot_system.slice，soc1 manifest 未再分组） | 上表全部 | ~123 | ~150 | ~138 | ~143 | **~173** | — |
+| rk `robot_realtime.slice`（CPUWeight 10000 · MemoryMin 500MB） | mc + device_manager | 90.5⑤ | 133.5 | 137.6 | 135.2 | 135.0 | 296 |
+| rk `robot_interaction.slice`（CPUWeight 3000） | agent + display_ui + audio_manager + task_engine | 133.5 | **187.6** | 156.0 | 176.5 | 163.6 | 1599 |
+| rk `robot_auxiliary.slice`（CPUWeight 500 · **CPUQuota 40%**） | data_exporter | 0.6 | 0.8 | 0.7 | 0.8 | 0.7 | 60 |
+| rk `robot_system.slice` + 系统服务（CPUWeight 5000/10000） | 其余全部业务 + iox-roudi/音频/网络等基座 | 171.4 | 192.8 | 187.8 | 191.4 | 190.0 | —（含 iox 794 共享） |
+| orin 全部业务（robot_system.slice，soc1 manifest 未再分组） | 上表全部 | ~129 | ~150 | ~138 | ~143 | **~173** | — |
+
+⑤ 基线列为静止态快照重测值；UC1–UC3 列为连续采样（含采样器恒定开销），realtime 类读数亦与机器人姿态相关（运动/变形期间 mc 满负荷）。
 
 #### C.3.4 整机级（单位见表内；板级 CPU 为「全部核合计」口径，100% = 整板所有核满载，与进程表的「单核=100%」不同）
 
-| 维度（单位） | 板 | BASE | UC1 跳舞 | UC2a 趴下 | UC2b 站立 | UC3 牵手 |
+| 维度（单位） | 板 | BASE（快照重测） | UC1 跳舞⑥ | UC2a 趴下 | UC2b 站立 | UC3 牵手 |
 |---|---|---|---|---|---|---|
-| **CPU 占用率**（busy%，全核合计） | rk（8 核） | 74.8% | **83.6%** | 78.7% | 81.9% | 80.6% |
-| | orin（6 核） | 67.8% | 72.9% | 71.3% | 71.7% | **76.4%** |
-| **内存占用**（used/total，MiB） | rk | 3812/7919 | 3846/7919 | 3852/7919 | 3850/7919 | 3853/7919 |
-| | orin（tegrastats 口径） | 3740/7604 | 3751/7604 | 3752/7604 | 3756/7604 | 3771/7604 |
-| **GPU 算力占用**（利用率 %） | rk Mali-G52（**图形 GPU，仅为胸屏渲染/UI**，非 AI；证据：/dev/dri + kbase 内核线程 + devfreq，§2.1） | 33% | 33% | 33% | 34% | 34% |
-| | orin GR3D（Ampere，TensorRT 推理） | 14% | 14% | 17% | 13% | 13% |
-| **NPU 算力占用**（rk3576 双核各自利用率 %） | rk（仅 Agent 使用） | Core0 29 / Core1 10 | 31/5 | 33/9 | 33/6 | **36**/6 |
+| **CPU 占用率**（busy%，全核合计） | rk（8 核） | **72.2%** | **83.6%** | 78.7% | 81.9% | 80.6% |
+| | orin（6 核） | **26.7%** | 72.9% | 71.3% | 71.7% | **76.4%** |
+| **内存占用**（used/total，MiB） | rk | 3616/7919 | 3846/7919 | 3852/7919 | 3850/7919 | 3853/7919 |
+| | orin（tegrastats 口径） | 3385/7604 | 3751/7604 | 3752/7604 | 3756/7604 | 3771/7604 |
+| **GPU 算力占用**（利用率 %） | rk Mali-G52（**图形 GPU，仅为胸屏渲染/UI**，非 AI；证据：/dev/dri + kbase 内核线程 + devfreq，§2.1） | 34% | 33% | 33% | 34% | 34% |
+| | orin GR3D（Ampere，TensorRT 推理） | **5%** | 14% | 17% | 13% | 13% |
+| **NPU 算力占用**（rk3576 双核各自利用率 %） | rk（仅 Agent 使用） | Core0 26 / Core1 12 | 31/5 | 33/9 | 33/6 | **36**/6 |
 | **GPU「显存」占用** | rk / orin | **无独立数值**——统一内存，与上行「内存占用」同池同数（GPU/NPU 用量已含其中） | ← | ← | ← | ← |
-| 整板功耗（W，仅 orin 可测 VDD_IN） | orin | 9.2 | 9.4 | 9.3 | 9.3 | 9.5 |
+| 整板功耗（W，仅 orin 可测 VDD_IN） | orin | **7.9** | 9.4 | 9.3 | 9.3 | 9.5 |
 
-**结论要点**：① rk 常态即高负载（~75% busy），最大消耗者为 Agent（108%≈1.1 核 + 1.4GB，含语音前端与 NPU 视觉模型驻留）；跳舞时增量主要落在 **interaction slice（+33%）**：Agent 语义链路 + 胸屏表情渲染翻倍 + task_engine；MC 实时核负载基本恒定（RL 策略常驻推理，与动作类型弱相关）。② orin 感知为常驻负载（GPU 13~17%），任务增量集中在 **percep（+9~15pp）与 nav2 栈（+7~12pp）、follow（+10pp @UC3）**；UC3（牵手行走）是 orin 最重场景（busy 76.4%）。③ NPU 仅 Agent 使用，行走/交互时升至 36%（人脸+手势连续推理）。④ 内存对各 usecase 几乎不敏感（±40MiB，模型全部常驻）；GPU 利用率两板均处低位，说明推理以小模型/低帧率运行，算力余量大。⑤ 功耗（orin 9.2→9.5W）对 usecase 不敏感。
+⑥ **UC1–UC3 列为连续采样法**，其板级绝对值含采样器恒定开销（实测 orin 板级 busy 约 +40pp、GR3D +9pp、RAM +350MiB、功耗 +1.3W；rk 约 +2.6pp）——**阶段间的相对变化有效**（如 orin UC3 较 UC 基线 +8.6pp），跨阶段对比请用相对增量与进程级列。
+
+**结论要点**：① rk 常态即高负载（重测确认 **~72% busy 为真实水平**，采样开销仅 +2.6pp），常驻大头为 Agent（104%≈1 核 + 1.2GB，含语音前端与 NPU 视觉模型驻留）、device_manager 47%、mc 43%（静止态；运动/变形时升至 75%+）、odom 38%、drp 29%、app_proxy 29%；跳舞时增量主要落在 **interaction slice（133.5→187.6，+40%）**：Agent 语义链路 + 胸屏表情渲染翻倍 + task_engine。② **orin 真实基线很轻**（重测 26.7% busy、GR3D 5%、7.9W——上轮连续采样将其分别抬高约 40pp/9pp/1.3W）；任务增量集中在 **percep（+9~15pp）与 nav2 栈（+7~12pp）、follow（+10pp @UC3）**，UC3（牵手行走）是 orin 最重场景（板级相对基线 +8.6pp）。③ NPU 仅 Agent 使用（基线 Core0 26%），行走/交互时升至 36%（人脸+手势连续推理）。④ 内存对各 usecase 几乎不敏感（rk 3.6GiB、orin 3.3GiB 常驻，模型全部驻留）；GPU 利用率两板均处低位（rk 34% 图形渲染、orin 5% 推理），算力余量大。⑤ 功耗（orin 基线 7.9W，UC 期间 9.3~9.5W 含采样开销，真实增量约 +1W）。
 
 ### C.4 启动脚本与部署资源
 
@@ -1525,7 +1595,7 @@ flowchart LR
 | 优先级机制 | 实测值 | 说明 |
 |---|---|---|
 | 调度策略 | **全部进程/线程 SCHED_OTHER、Nice 0**（无 RT 线程在跑） | mc 的 SCHED_RR:80 为预设未启用（见上） |
-| CPU 亲和性 | 普通进程 `0,1,4-7`（isolcpus=2,3）；**mc 36 线程钉 CPU3**；**CAN0/CAN1 中断(irq83/84)+rk_timer 钉 CPU2** | §2.2 实测一致 |
+| CPU 亲和性 | 普通进程 `0,1,4-7`（isolcpus=2,3）；**mc 36 线程钉 CPU3**；**CAN0/CAN1 中断(irq83/84)+rk_timer 钉 CPU2** | §2.4 实测一致 |
 | cgroup CPUWeight | `robot.slice` 10000 → realtime **10000**（+**MemoryMin=500MB**）/ system 5000 / interaction 3000 / auxiliary 500 + **CPUQuota 40%**（cpu.max=40000/100000） | realtime=mc+device_manager；interaction=agent+display_ui+audio_manager+task_engine；auxiliary=data_exporter；其余 → robot_system |
 | 守护优先级 | em.service Restart=always/5s；iox-roudi OOMScoreAdjust=-1000（最后被杀）；process_manager 按配置重启子应用 | hds+sys_guard 健康诊断兜底 |
 
