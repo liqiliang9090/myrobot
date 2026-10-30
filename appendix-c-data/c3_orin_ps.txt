@@ -1,0 +1,294 @@
+    PID    PPID USER      NI CLS COMMAND
+      1       0 root       0  TS /sbin/init 2
+      2       0 root       0  TS [kthreadd]
+      3       2 root     -20  TS [rcu_gp]
+      4       2 root     -20  TS [rcu_par_gp]
+      5       2 root     -20  TS [slub_flushwq]
+      6       2 root     -20  TS [netns]
+      8       2 root     -20  TS [kworker/0:0H-events_highpri]
+     10       2 root     -20  TS [mm_percpu_wq]
+     11       2 root       0  TS [rcu_tasks_kthre]
+     12       2 root       0  TS [rcu_tasks_rude_]
+     13       2 root       0  TS [rcu_tasks_trace]
+     14       2 root       0  TS [ksoftirqd/0]
+     15       2 root       -  FF [rcu_preempt]
+     16       2 root       -  FF [rcub/0]
+     17       2 root       -  FF [rcuc/0]
+     18       2 root       -  FF [migration/0]
+     20       2 root       0  TS [cpuhp/0]
+     21       2 root       0  TS [cpuhp/1]
+     22       2 root       -  FF [migration/1]
+     23       2 root       -  FF [rcuc/1]
+     24       2 root       0  TS [ksoftirqd/1]
+     26       2 root     -20  TS [kworker/1:0H-kblockd]
+     27       2 root       0  TS [cpuhp/2]
+     28       2 root       -  FF [migration/2]
+     29       2 root       -  FF [rcuc/2]
+     30       2 root       0  TS [ksoftirqd/2]
+     32       2 root     -20  TS [kworker/2:0H-events_highpri]
+     33       2 root       0  TS [cpuhp/3]
+     34       2 root       -  FF [migration/3]
+     35       2 root       -  FF [rcuc/3]
+     36       2 root       0  TS [ksoftirqd/3]
+     38       2 root     -20  TS [kworker/3:0H-kblockd]
+     39       2 root       0  TS [cpuhp/4]
+     40       2 root       -  FF [migration/4]
+     41       2 root       -  FF [rcuc/4]
+     42       2 root       0  TS [ksoftirqd/4]
+     44       2 root     -20  TS [kworker/4:0H-kblockd]
+     45       2 root       0  TS [cpuhp/5]
+     46       2 root       -  FF [migration/5]
+     47       2 root       -  FF [rcuc/5]
+     48       2 root       0  TS [ksoftirqd/5]
+     49       2 root       0  TS [kworker/5:0-events]
+     50       2 root     -20  TS [kworker/5:0H-kblockd]
+     51       2 root       0  TS [kdevtmpfs]
+     57       2 root     -20  TS [inet_frag_wq]
+     58       2 root       0  TS [kauditd]
+     59       2 root       0  TS [khungtaskd]
+     60       2 root       0  TS [oom_reaper]
+     61       2 root     -20  TS [writeback]
+     62       2 root       0  TS [kcompactd0]
+     63       2 root       5  TS [ksmd]
+     64       2 root      19  TS [khugepaged]
+     75       2 root     -20  TS [cryptd]
+     94       2 root     -20  TS [kintegrityd]
+     95       2 root     -20  TS [kblockd]
+     96       2 root     -20  TS [blkcg_punt_bio]
+     97       2 root     -20  TS [tpm_dev_wq]
+     98       2 root     -20  TS [ata_sff]
+     99       2 root     -20  TS [edac-poller]
+    100       2 root     -20  TS [devfreq_wq]
+    101       2 root       -  FF [watchdogd]
+    102       2 root       0  TS [kworker/u12:1-events_freezable_power_]
+    104       2 root     -20  TS [kworker/0:1H-kblockd]
+    105       2 root     -20  TS [rpciod]
+    106       2 root     -20  TS [kworker/u13:0]
+    107       2 root     -20  TS [xprtiod]
+    135       2 root       0  TS [kswapd0]
+    137       2 root     -20  TS [nfsiod]
+    140       2 root     -20  TS [vfio-irqfd-clea]
+    141       2 root     -20  TS [dm_bufio_cache]
+    142       2 root       0  TS [kworker/4:2-events]
+    143       2 root     -10  TS [krfcommd]
+    144       2 root       0  TS [pr/tty0]
+    145       2 root       0  TS [pr/ttyTCU0]
+    148       2 root       -  FF [irq/114-3160000]
+    149       2 root       0  TS [kworker/3:2-pm]
+    150       2 root       -  FF [irq/115-3180000]
+    153       2 root       -  FF [irq/116-31b0000]
+    154       2 root       -  FF [irq/166-c240000]
+    156       2 root       -  FF [irq/167-c250000]
+    158       2 root       -  FF [irq/124-3610000]
+    159       2 root       -  FF [irq/121-3610000]
+    160       2 root       0  TS [kworker/4:3-events]
+    161       2 root       0  TS [kworker/5:4-events]
+    177       2 root     -20  TS [kworker/2:1H-kblockd]
+    185       2 root       -  FF [irq/190-tegra-p]
+    187       2 root     -20  TS [nvme-wq]
+    188       2 root     -20  TS [nvme-reset-wq]
+    189       2 root     -20  TS [nvme-delete-wq]
+    223       2 root       -  FF [irq/192-tegra-p]
+    226       2 root       -  FF [irq/192-aerdrv]
+    227       2 root       -  FF [irq/194-tegra-p]
+    232       2 root     -20  TS [kworker/1:1H-kblockd]
+    233       2 root       0  TS [jbd2/nvme0n1p1-]
+    234       2 root     -20  TS [ext4-rsv-conver]
+    242       2 root     -20  TS [kworker/3:1H-kblockd]
+    244       2 root       0  TS [jbd2/nvme0n1p19]
+    245       2 root     -20  TS [ext4-rsv-conver]
+    248       2 root       0  TS [jbd2/nvme0n1p24]
+    249       2 root     -20  TS [ext4-rsv-conver]
+    257       2 root       0  TS [jbd2/nvme0n1p17]
+    258       2 root     -20  TS [ext4-rsv-conver]
+    260       2 root       0  TS [jbd2/nvme0n1p21]
+    261       2 root     -20  TS [ext4-rsv-conver]
+    263       2 root       0  TS [jbd2/nvme0n1p22]
+    264       2 root     -20  TS [ext4-rsv-conver]
+    266       2 root       0  TS [jbd2/nvme0n1p23]
+    267       2 root     -20  TS [ext4-rsv-conver]
+    269       2 root       0  TS [jbd2/nvme0n1p5-]
+    270       2 root     -20  TS [ext4-rsv-conver]
+    276       2 root       0  TS [jbd2/nvme0n1p18]
+    277       2 root     -20  TS [ext4-rsv-conver]
+    318       2 root     -20  TS [mld]
+    319       2 root     -20  TS [ipv6_addrconf]
+    347       2 root     -20  TS [kworker/4:1H-kblockd]
+    349       2 root     -20  TS [kworker/5:1H-kblockd]
+    356       2 root       0  TS [kworker/u12:7-events_freezable_power_]
+    363       2 root      19  TS [nvmap-bz]
+    365       1 root       0  TS /lib/systemd/systemd-udevd
+    366       2 root       -  FF [irq/187-host1x_]
+    368       2 root       -  FF [irq/188-tegra-p]
+    369     365 root       0  TS /lib/systemd/systemd-udevd
+    370     365 root       0  TS /lib/systemd/systemd-udevd
+    371     365 root       0  TS /lib/systemd/systemd-udevd
+    372     365 root       0  TS /lib/systemd/systemd-udevd
+    373     365 root       0  TS /lib/systemd/systemd-udevd
+    374     365 root       0  TS /lib/systemd/systemd-udevd
+    375     365 root       0  TS /lib/systemd/systemd-udevd
+    376     365 root       0  TS /lib/systemd/systemd-udevd
+    377     365 root       0  TS /lib/systemd/systemd-udevd
+    378     365 root       0  TS /lib/systemd/systemd-udevd
+    379     365 root       0  TS /lib/systemd/systemd-udevd
+    380     365 root       0  TS /lib/systemd/systemd-udevd
+    381     365 root       0  TS /lib/systemd/systemd-udevd
+    382     365 root       0  TS /lib/systemd/systemd-udevd
+    383     365 root       0  TS /lib/systemd/systemd-udevd
+    384     365 root       0  TS /lib/systemd/systemd-udevd
+    385     365 root       0  TS /lib/systemd/systemd-udevd
+    386     365 root       0  TS /lib/systemd/systemd-udevd
+    387     365 root       0  TS /lib/systemd/systemd-udevd
+    388     365 root       0  TS /lib/systemd/systemd-udevd
+    389     365 root       0  TS /lib/systemd/systemd-udevd
+    390     365 root       0  TS /lib/systemd/systemd-udevd
+    391     365 root       0  TS /lib/systemd/systemd-udevd
+    392     365 root       0  TS /lib/systemd/systemd-udevd
+    393     365 root       0  TS /lib/systemd/systemd-udevd
+    394     365 root       0  TS /lib/systemd/systemd-udevd
+    395     365 root       0  TS /lib/systemd/systemd-udevd
+    396     365 root       0  TS /lib/systemd/systemd-udevd
+    397       2 root       -  FF [irq/188-aerdrv]
+    399       2 root       -  FF [irq/218-bc00000]
+    402       2 root       -  FF [capture-control]
+    403       2 root       -  FF [capture]
+    405       2 root       -  FF [irq/196-gk20a_s]
+    406       2 root       -  FF [irq/197-gk20a_s]
+    407       2 root       -  FF [irq/198-gk20a_s]
+    408       2 root       -  FF [irq/199-gk20a_n]
+    422       2 root       -  FF [irq/239-nvvrs-p]
+    423       2 root       -  FF [irq/213-tegra_d]
+    424       2 root       -  FF [irq/214-tegra_d]
+    426       2 root     -20  TS [dce-async-ipc-w]
+    434       2 root       -  FF [irq/118-3210000]
+    437       2 root       0  TS [spi0]
+    438       2 root       0  TS [nv_queue]
+    439       2 root       0  TS [nv_queue]
+    447       2 root       -  FF [irq/119-3230000]
+    448       2 root       0  TS [spi1]
+    453       2 root       -  FF [irq/242-rtc-pcf]
+    480       1 root      -1  TS /lib/systemd/systemd-journald
+    489       1 systemd+   0  TS /lib/systemd/systemd-resolved
+    491       1 root       0  TS /bin/bash /etc/systemd/nv-tee-supplicant.sh
+    493       1 root      -4  TS /sbin/auditd
+    496     493 root      -4  TS /sbin/audisp-syslog LOG_INFO
+    498     491 root       0  TS /usr/sbin/tee-supplicant
+    502       2 root     -20  TS [optee_bus_scan]
+    521       2 root       0  TS [audit_prune_tre]
+    528       1 message+   0  TS @dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+    529       1 root       0  TS /usr/sbin/NetworkManager --no-daemon
+    532       1 root       0  TS /usr/libexec/iwd
+    536       1 root       0  TS /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+    555       1 root       0  TS /lib/systemd/systemd-logind
+    557       1 root       0  TS /sbin/wpa_supplicant -u -s -O /run/wpa_supplicant
+    692       1 root       0  TS /usr/sbin/nvfancontrol &
+    812       2 root       0  TS [file-storage]
+    839       2 root     -20  TS [cfg80211]
+    853       1 root       0  TS /bin/bash /etc/systemd/nvmemwarning.sh
+    869       2 root       0  TS [pr/ramoops-1]
+    870       2 root       0  TS [sw-quiesce]
+    871       2 root       0  TS [nvgpu_channel_p]
+    872       2 root       0  TS [nvgpu_pg_init_g]
+    873       2 root       0  TS [nvgpu_clk_arb_p]
+    887       1 root       0  TS /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
+    891       1 run        0  TS /bin/bash /robot/software/entry/run_roudi.sh
+    921       1 root       0  TS sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups
+    970     891 run        0  TS /opt/iceoryx/bin/iox-roudi -c /robot/software/entry/cfg/roudi_config.toml -m on
+   1023       1 root       0  TS /usr/sbin/nvphsd
+   1024    1023 root       0  TS /usr/sbin/nvphsd
+   1053       1 root       0  TS /usr/sbin/nvargus-daemon
+   1057       1 root       0  TS /usr/sbin/nvs-service
+   1086       1 root       0  TS /usr/sbin/cron -f -P
+   1107       1 root       0  TS /sbin/agetty -o -p -- \u --keep-baud 115200,57600,38400,9600 ttyGS0 vt220
+   1111       1 root       0  TS /sbin/agetty -o -p -- \u --keep-baud 115200,57600,38400,9600 ttyTCU0 vt220
+   1363       1 root       0  TS /bin/bash /robot/software/process_manager/bin/start_process_manager.sh
+   1364       1 root       0  TS /usr/sbin/ptp4l -f /etc/linuxptp/ptp4l.conf -m -s -S
+   1442    1363 root       0  TS ./process_manager --cfg_file_path=./cfg/process_manager_config.yaml
+   1480       1 root       0  TS sudo -u #0 -g #0 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/sys_guard/bin/start_sys_guard.sh
+   1481       1 root       0  TS /usr/bin/tetherd --bind 10.1.1.101
+   1489    1480 root       0  TS /bin/bash /robot/software/sys_guard/bin/start_sys_guard.sh
+   1493       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/hal_rgbd/bin/em_run.sh
+   1496    1489 root       0  TS ./sys_guard --cfg_file_path=./cfg/sys_guard_app.yaml
+   1497    1493 run        0  TS ./aimrt_main --cfg_file_path=./cfg/t1_v2d1/t1_v2d1_config.yaml
+   1502       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/hal_camera/bin/em_run.sh
+   1504    1502 run        0  TS /bin/bash /robot/software/hal_camera/bin/em_run.sh
+   1507       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/hal_sensor/bin/em_run.sh
+   1512    1507 run        0  TS /bin/bash /robot/software/hal_sensor/bin/em_run.sh
+   1522    1512 run        0  TS ./aimrt_main --cfg_file_path=cfg/hal_sensor_orin_t1_cfg.yaml
+   1527    1504 run        0  TS ./aima-hal_camera-app-main --cfg_file_path=cfg/hal_camera_module_config_orin_t1.yaml --process_name=hal_camera
+   1615       1 root       0  TS sudo -u #0 -g #0 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/data_exporter/bin/em_run.sh
+   1623       1 root       0  TS sudo -u #0 -g #0 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/ota/bin/em_run.sh
+   1624    1615 root       0  TS /bin/bash /robot/software/data_exporter/bin/em_run.sh
+   1625       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/algorithm/follow/bin/start_follow.sh
+   1627    1624 root       0  TS ./aima-data_exporter-app --cfg_file_path=./cfg/data_exporter.yaml
+   1628    1623 root       0  TS /bin/bash /robot/software/ota/bin/em_run.sh
+   1633    1625 run        0  TS /bin/bash /robot/software/algorithm/follow/bin/start_follow.sh
+   1634       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/coreon_fusion/bin/em_run.sh
+   1646       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/algorithm/target_follow_perception/bin/start_target_follow_perception_T
+   1649    1634 run        0  TS /bin/bash /robot/software/coreon_fusion/bin/em_run.sh
+   1651       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/algorithm/path_follow_node/bin/em_run.sh
+   1654       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/algorithm/brightness_detection/bin/start_brightness_status_T
+   1660    1646 run        0  TS ./aimrt_main --cfg_file_path=./cfg/aimrt_person_track_config_T.yaml
+   1673    1628 root       0  TS ./aima_ota_slave_app --cfg_file_path=./cfg/ota_slave_soc1.yaml
+   1675    1651 run        0  TS /bin/bash /robot/software/algorithm/path_follow_node/bin/em_run.sh
+   1699    1654 run        0  TS ./aimrt_main --cfg_file_path=./cfg/aimrt_brightness_status_config_T.yaml
+   1701       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/algorithm/nav2_bringup/bin/start_nav
+   1705       1 root       0  TS sudo -u #1000 -g #1000 -E --preserve-env=PYTHONPATH EM_APP_NAME FASTRTPS_DEFAULT_PROFILES_FILE LOG_PATH ROBOT_FEATURE_ROS2_CHANNEL_QOS ROS_LOG_DIR /robot/software/algorithm/perception/bin/start_percep.sh
+   1708    1701 run        0  TS /usr/bin/python3 /opt/ros/humble/bin/ros2 launch nav2_bringup start_real_navigation.launch.py
+   1718    1705 run        0  TS bash /robot/software/algorithm/perception/bin/start_percep.sh
+   1828    1649 run        0  TS ./coreon_fusion --cfg_file_path=cfg/coreon_fusion_config.yaml
+   1957    1633 run        0  TS /usr/bin/python3 /opt/ros/humble/bin/ros2 launch follow follow.launch.py
+   1964    1675 run        0  TS /usr/bin/python3 /opt/ros/humble/bin/ros2 launch path_follow_node trajectory_tracker.launch.py
+   1966    1718 run        0  TS /robot/software/algorithm/perception/bin/percep --cfg_file_path=/robot/software/algorithm/perception/config/percep_aimrt.yaml
+   2000    1957 run        0  TS /robot/software/algorithm/follow/lib/follow/follow_node --v:=1 --ros-args -r __node:=follow_node --params-file /robot/software/algorithm/follow/share/follow/config/t_series/follow_params_dog.yaml --params-file /tmp/launch_params_yxoakksa
+   2014    1964 run        0  TS /robot/software/algorithm/path_follow_node/lib/path_follow_node/trajectory_tracker --ros-args -r __node:=trajectory_tracker --params-file /tmp/launch_params_vpt4l7xh
+   2050       2 root       0  TS [vi-output, ofil]
+   2051       2 root       0  TS [vi-output, ofil]
+   2063       2 root       0  TS [vi-output, ofil]
+   2064       2 root       0  TS [vi-output, ofil]
+   2084    1708 run        0  TS /opt/ros/humble/lib/tf2_ros/static_transform_publisher 0 0 0 0 0 0 map odom --ros-args -r __node:=map_to_odom_tf_publisher --params-file /tmp/launch_params_l2fdy3b0
+   2086    1708 run        0  TS /opt/ros/humble/lib/tf2_ros/static_transform_publisher --x 0.0 --y 0.0 --z 0.0 --roll -1.570796 --pitch 0.0 --yaw -1.570796 --frame-id base_link --child-frame-id camera_point_cloud --ros-args -r __node:=camera_to_base_tf_publisher --params-file /tmp/launch_params_p6ou8t3a
+   2088    1708 run        0  TS /opt/ros/humble/lib/tf2_ros/static_transform_publisher --x 0.0 --y 0.0 --z 0.06 --roll -0.523599 --pitch 0.0 --yaw 0.0 --frame-id camera_point_cloud --child-frame-id rear_tof_sensor --ros-args -r __node:=rear_tof_to_combined_tf_publisher --params-file /tmp/launch_params_0yoxbnqu
+   2090    1708 run        0  TS /opt/ros/humble/lib/tf2_ros/static_transform_publisher --x 0.0 --y 0.0 --z -0.06 --roll -0.523599 --pitch 3.141593 --yaw 0.0 --frame-id camera_point_cloud --child-frame-id front_tof_sensor --ros-args -r __node:=front_tof_to_combined_tf_publisher --params-file /tmp/launch_params_s4fzoqsm
+   2092    1708 run        0  TS /robot/software/algorithm/nav2_perception/lib/nav2_perception/pointcloud_combiner_node --ros-args -r __node:=pointcloud_combiner_node --params-file /tmp/launch_params_zpd12hps
+   2094    1708 run        0  TS /robot/software/algorithm/nav2_perception/lib/nav2_perception/perception_node --ros-args -r __node:=perception_node --params-file /tmp/tmp4yo7jx1y --params-file /tmp/launch_params__elj6eq9
+   2096    1708 run        0  TS /robot/software/algorithm/nav2_lifecycle_manager/lib/nav2_lifecycle_manager/lifecycle_manager --ros-args -r __node:=lifecycle_manager_t1_perception --params-file /tmp/launch_params_75cabdtz
+   2106    1708 run        0  TS /opt/ros/humble/lib/rclcpp_components/component_container_mt --ros-args --log-level info --ros-args -r __node:=nav2_container --params-file /tmp/launch_params_p_ivgarg --params-file /tmp/launch_params_6dtr_isb -r /tf:=tf -r /tf_static:=tf_static
+   2117       2 root       0  TS [vi-output, ofil]
+   2118       2 root       0  TS [vi-output, ofil]
+   2119       2 root       0  TS [vi-output, ofil]
+   2120       2 root       0  TS [vi-output, ofil]
+   2121       2 root       0  TS [vi-output, ofil]
+   2122       2 root       0  TS [vi-output, ofil]
+   2123       2 root       0  TS [vi-output, ofil]
+   2124       2 root       0  TS [vi-output, ofil]
+   2125       2 root       0  TS [vi-output, ofil]
+   2126       2 root       0  TS [vi-output, ofil]
+   2267       2 root       0  TS [kworker/u12:3-events_freezable_power_]
+   2293       2 root       0  TS [kworker/u12:2-devfreq_wq]
+   2314       2 root       0  TS [kworker/u12:5-events_freezable_power_]
+   2316     921 root       0  TS sshd: run [priv]
+   2319       1 run        0  TS /lib/systemd/systemd --user
+   2320    2319 run        0  TS (sd-pam)
+   2326    2319 run        0  TS /usr/bin/mpris-proxy
+   2330    2319 run        0  TS /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+   2397    2316 run        0  TS sshd: run@pts/0
+   2398    2397 run        0  TS -bash
+   2427       2 root       0  TS [kworker/0:2-events]
+   2440       2 root       0  TS [kworker/u12:8-events_freezable_power_]
+   2443       2 root       0  TS [kworker/1:0-events]
+   2449       2 root       0  TS [kworker/2:1-events]
+   2540       2 root       0  TS [kworker/1:1-events]
+   2541       2 root       0  TS [kworker/u12:6-events_freezable_power_]
+   2544       2 root       0  TS [kworker/0:0-events]
+   2546       2 root       0  TS [kworker/2:2-events]
+   2558       2 root       0  TS [kworker/3:0-pm]
+   2560       2 root       0  TS [kworker/u12:0-devfreq_wq]
+   2561       2 root       0  TS [kworker/1:2-events]
+   2565       2 root       0  TS [kworker/2:0-events]
+   2566       2 root       0  TS [kworker/0:1-cgroup_destroy]
+   2572     853 root       0  TS sleep 300
+   2662       2 root       0  TS [kworker/u12:4-events_freezable_power_]
+   2663     921 root       0  TS sshd: run [priv]
+   2734    2663 run        0  TS sshd: run@notty
+   2735    2734 run        0  TS ps -eo pid,ppid,user,ni,cls,args --sort=pid
