@@ -165,11 +165,11 @@ rk 内核启动参数做了 CPU 隔离（`/sys/devices/system/cpu/isolated` = **
 | 占用者（线程） | 调度方式 | 优先级 | 功能 / 用途 |
 |---|---|---|---|
 | mc `rt_iceoryx_sub` | **SCHED_RR** | **rtprio 85** | 传感器/指令 **iceoryx 零拷贝实时订阅**（运控输入关键路径，全板最高用户态优先级） |
-| mc `rt_joint_pub`、`passive_default_t0` | **SCHED_RR** | **rtprio 80** | 关节状态实时发布；被动/默认控制环 |
+| mc `rt_joint_pub`、`passive_default_t0` | **SCHED_RR** | **rtprio 80** | 关节状态实时发布；控制环线程——**其名字随运控模式切换**（2026-10-30 实测）：静止时 `passive_default_t0`（被动/默认控制环），**四足站立/运动时更名为 `rl_quad_locomotion_t0`**（RL 四足运动策略推理环，同 tid 同 RR 80；站立时瞬时 ~17.6% CPU、策略持续推理维持站姿，`rt_iceoryx_sub` 同步拉满 ~30%）。线程名系运行时拼接（二进制无字面名），`rl/` 共 48 份策略 yaml（如 `quad_walk_dance.yaml` → `t2_quad_twist_xy_v1.0_0708.onnx`，配置中留有 `.rknn` NPU 试验注释，现役 onnx/CPU）；**ORT 无独立线程池（36 线程中无一 onnx/omp 线程），推理即在调用线程内执行**——其余模式（双足 WBC/舞蹈/模仿）是否同样复用此线程槽未逐一实测 |
 | mc `mc_t1`、`mc_sm_thread`、`MotionControl executor ×2`、`com_data_pub`、`hds_pub`、`event_trace_pub`、`security_guard`、`main_executor` | SCHED_OTHER | nice 0 | **运控内核主体**：T1 机型控制逻辑、状态机、运动控制执行器、`mc/common/state` 状态与诊断发布、安全看护 |
 | mc `ros2_executor ×2`、`RMW_node`、`RTPS{log,event,flow_control}`、`UDP* ×6`、`aimrt_guard`、`nsm/default executor ×4`、`KeepAlive`、`default_time_wheel` | SCHED_OTHER | nice 0 | AimRT / ROS 2 / FastDDS 框架线程（通信与执行器底座，全部随进程钉在 CPU3） |
 
-> 采集口径：2026-10-30 实测（重启后 mc pid=2672、device_manager pid=2698，pid 随启动变化）；线程名截断自 `ps -L -o comm`（15 字符限长）。
+> 采集口径：2026-10-30 实测（重启后 mc pid=2672、device_manager pid=2698，pid 随启动变化）；线程名截断自 `ps -L -o comm`（15 字符限长）。**机器人四足站立态复测**：线程总数与调度结构不变（36=3RR+33TS、dm 6RR 钉 CPU2），但 CPU2 利用率升至 ~73%（CAN 中断+设备轮询满负荷）、CPU3 ~42%（RL 站姿策略环+实时订阅/发布），且控制环线程切换为 RL 运动策略身份（见上表注）。
 
 > 结论：rk 用「1 核收 CAN 中断+device_manager 实时设备线程 + 1 核跑运动控制」的隔离方案替代了 PREEMPT_RT，其余 6 核（2×A53 + 4×A72）跑全部业务栈。
 > 全板 RT 线程普查（2026-10-30 实测）：用户态实时线程共 **9 个 SCHED_RR**（mc ×3 @CPU3、device_manager ×6 @CPU2，另有 rtkit-daemon@99）+ 32 个 SCHED_FIFO **内核线程**（migration/irq/watchdog 等）；其余 ~1460 线程均为 SCHED_OTHER。
@@ -877,7 +877,7 @@ flowchart TB
         APP["📱 手机 PrimeBot App<br/>连 rk p2p0 热点 192.168.88.x"]
         CLOUD["☁ 启元云端<br/>aiem-gw.primebot.cn"]
         RCDEV["🎮 体感遥控器<br/>蓝牙私有协议"]
-        QJDEV["⭕ 圈圈 UWB 随行器<br/>BLE + UWB 测距"]
+        QJDEV["⭕ 「圈圈」UWB 随行标签<br/>（quanji，板上代号）BLE+UWB 测距测角<br/>IMU+雷达活体检测+麦克风"]
         I360["📷 Insta360 云台相机<br/>WiFi 接入"]
     end
 
