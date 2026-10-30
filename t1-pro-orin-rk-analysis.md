@@ -94,7 +94,7 @@
 ```mermaid
 flowchart TB
     subgraph RK3576["🖥 rk3576 SoC（瑞芯微 · 统一内存）——AI = CPU + NPU，GPU 只做图形"]
-        RK_CPU0["CPU 簇 0：4× Cortex-A53 ≤2016MHz<br/>（CPU2=CAN 硬中断 · CPU3=MC 独占，见 §2.4）"]
+        RK_CPU0["CPU 簇 0：4× Cortex-A53 ≤2016MHz<br/>（CPU2=CAN 硬中断+device_manager 实时线程<br/>CPU3=MC 独占，见 §2.4）"]
         RK_CPU1["CPU 簇 1：4× Cortex-A72 ≤2208MHz<br/>（全部业务栈跑 CPU0/1/4-7）"]
         RK_GPU["Mali-G52 MC3 图形 GPU<br/>300–900MHz（仅胸屏/UI 渲染，非 AI）"]
         RK_NPU["NPU：6 TOPS INT8 · 双核 @950MHz<br/>（RKNN · Agent 视觉 6 模型专用）"]
@@ -148,14 +148,31 @@ rk 内核启动参数做了 CPU 隔离（`/sys/devices/system/cpu/isolated` = **
 - 普通用户进程（含 sshd 登录 shell）的默认亲和性被设为 **`0,1,4-7`**（`taskset -pc 1` 实测 = `0,1,4-7`），所以 `nproc` 只看到 **6** 个 CPU——`lscpu` 才显示真实的 8。
 - 整机几乎所有用户态进程都带 `0,1,4-7` 亲和性（systemd 全局默认），即**调度器层面与隔离核绝缘**。
 
-**隔离核上到底跑了什么（实测）：**
+**隔离核上到底跑了什么（2026-10-30 线程级实测，`ps -eLo`/`ps -L`/`/proc/irq`）：**
 
-| 隔离核 | 占用者（实测证据） | 作用 |
-|---|---|---|
-| **CPU2** | 中断亲和性 `2`：`irq14 rk_timer`、`irq38/39 arm-pmu`、**`irq83 can0`（累计 ~600 万次）、`irq84 can1`（~450 万次）**（`/proc/irq/*/smp_affinity_list`） | **CAN 总线中断专用核**：机器人 14 关节执行器/主控 MCU 挂在 can0/can1 上，硬中断全部收在 CPU2，不被任何进程抢占 |
-| **CPU3** | 进程亲和性 `3`：**`./mc_app_main --cfg_file_path=./cfg/mc_T1.yaml`**（pid 2669，comm `mc_main`，36 个线程全部钉在 CPU3，调度策略 SCHED_OTHER） | **运动控制主程序独占核**：PrimeMotion 实时运控内核用户态部分，独享一个核避免被普通负载干扰 |
+**CPU2 —— CAN 中断 + device_manager 实时设备线程专用核**
 
-> 结论：rk 用「1 核收 CAN 中断 + 1 核跑运动控制」的隔离方案替代了 PREEMPT_RT，其余 6 核（2×A53 + 4×A72）跑全部业务栈。
+| 占用者（线程/中断） | 调度方式 | 优先级 | 功能 / 用途 |
+|---|---|---|---|
+| `irq83 can0`、`irq84 can1` | 硬中断（未线程化） | —（中断上下文） | **CAN0/CAN1 总线收发**：14 关节执行器/主控 MCU 挂此两路总线（累计 ~600/~450 万次，`/proc/irq/*/smp_affinity_list` 实测钉 2） |
+| `irq14 rk_timer`、`irq38/39 arm-pmu` | 硬中断 | — | 内核定时器、PMU 性能计数采样 |
+| device_manager `rt_topic_sub`、`rt_iceoryx_sub` | **SCHED_RR** | **rtprio 85** | 设备数据实时订阅（DDS 话题 + iceoryx 零拷贝通道） |
+| device_manager `rt_dev_ioctl.0/.1`、`rt_dev_poll`、`rt_topic_pub` | **SCHED_RR** | **rtprio 80** | **本体设备实时 ioctl/轮询**（CAN/电源等设备读写）与实时发布——device_manager 常驻 ~50% CPU 的主因；注意其**进程本体亲和性为 `0,1,4-7`，仅这 6 个 rt 线程被单独钉在 CPU2**（线程级 affinity） |
+| `cpuhp/2`、`migration/2`、`ksoftirqd/2`、`kworker/2:*` | 内核线程（migration 为 SCHED_FIFO 99） | FF 99/其他 | 每核必备内核管家线程（isolcpus 不排除它们） |
+
+**CPU3 —— mc 运动控制独占核（进程亲和性=3，36 线程全覆盖）**
+
+| 占用者（线程） | 调度方式 | 优先级 | 功能 / 用途 |
+|---|---|---|---|
+| mc `rt_iceoryx_sub` | **SCHED_RR** | **rtprio 85** | 传感器/指令 **iceoryx 零拷贝实时订阅**（运控输入关键路径，全板最高用户态优先级） |
+| mc `rt_joint_pub`、`passive_default_t0` | **SCHED_RR** | **rtprio 80** | 关节状态实时发布；被动/默认控制环 |
+| mc `mc_t1`、`mc_sm_thread`、`MotionControl executor ×2`、`com_data_pub`、`hds_pub`、`event_trace_pub`、`security_guard`、`main_executor` | SCHED_OTHER | nice 0 | **运控内核主体**：T1 机型控制逻辑、状态机、运动控制执行器、`mc/common/state` 状态与诊断发布、安全看护 |
+| mc `ros2_executor ×2`、`RMW_node`、`RTPS{log,event,flow_control}`、`UDP* ×6`、`aimrt_guard`、`nsm/default executor ×4`、`KeepAlive`、`default_time_wheel` | SCHED_OTHER | nice 0 | AimRT / ROS 2 / FastDDS 框架线程（通信与执行器底座，全部随进程钉在 CPU3） |
+
+> 采集口径：2026-10-30 实测（重启后 mc pid=2672、device_manager pid=2698，pid 随启动变化）；线程名截断自 `ps -L -o comm`（15 字符限长）。
+
+> 结论：rk 用「1 核收 CAN 中断+device_manager 实时设备线程 + 1 核跑运动控制」的隔离方案替代了 PREEMPT_RT，其余 6 核（2×A53 + 4×A72）跑全部业务栈。
+> 全板 RT 线程普查（2026-10-30 实测）：用户态实时线程共 **9 个 SCHED_RR**（mc ×3 @CPU3、device_manager ×6 @CPU2，另有 rtkit-daemon@99）+ 32 个 SCHED_FIFO **内核线程**（migration/irq/watchdog 等）；其余 ~1460 线程均为 SCHED_OTHER。
 
 ---
 
@@ -1561,7 +1578,7 @@ flowchart LR
 > 部署在位但 manifest 注释未启动：orin 的 `slam`、`aprilgrid_loc`、`map_manager`、`recharge`、`drp`、`move_camera`/`face`/`yolov8`（rk 侧同）——与 C.3.2 资源表一致。另有低层二开模式开关：`MC_LOW_LEVEL_DEV=true` 时 PM 跳过自动启动 mc、mc 的 backend 从 iceoryx 切 ros2（em_run.sh 内置）。
 
 **每个应用的启动脚本**统一为 `/robot/software/<app>/bin/em_run.sh`（cd 本目录 → 注入 `LOG_PATH`/`LD_LIBRARY_PATH=../lib:./` → 应用特有 env → `exec ./<binary> --cfg_file_path=cfg/*.yaml`）。两个代表性样例：
-- `mc/bin/em_run.sh`：`SUB_NO_SCHEDULER=true`、`ROBOT_ENABLE_HDS/EVENT/MONITOR=false`、`AIMRT_PLUGIN_SHM_DEFAULT_WAIT_TIME_US=300`、**`AIMRTE_THREAD_SETTING_SHM/UDPany="[2,3]|SCHED_RR:80"`**（SHM/UDP 线程预设 SCHED_RR 80、钉 CPU2/3——当前被 SUB_NO_SCHEDULER 屏蔽，实测未激活）、`TOPIC_ENABLE_BACKEND=iceoryx`。
+- `mc/bin/em_run.sh`：`SUB_NO_SCHEDULER=true`、`ROBOT_ENABLE_HDS/EVENT/MONITOR=false`、`AIMRT_PLUGIN_SHM_DEFAULT_WAIT_TIME_US=300`、**`AIMRTE_THREAD_SETTING_SHM/UDPany="[2,3]|SCHED_RR:80"`**（该预设部分生效：实测 mc 的 `rt_iceoryx_sub@85`、`rt_joint_pub`/`passive_default_t0@80` 3 线程为 SCHED_RR 钉 CPU3，device_manager 另有 6 个 RR 线程钉 CPU2，见 §2.4）、`TOPIC_ENABLE_BACKEND=iceoryx`。
 - `task_engine/bin/em_run.sh`：通用模板 + SD 卡权限自修复（OTA 后 /robot/userdata/sd root→run）→ `./task_engine --cfg_file_path=cfg/interaction_module_config.yaml`。
 
 **每个启动脚本（em 应用）拉起的进程 → ROS 2 节点 → 接口规模**（P/S/V/C = 发布/订阅/服务端/客户端，数据引自 §4.1/§4.2 实测；「非 ROS」= iceoryx 或私有协议通道）：
@@ -1596,7 +1613,7 @@ flowchart LR
 
 | 优先级机制 | 实测值 | 说明 |
 |---|---|---|
-| 调度策略 | **全部进程/线程 SCHED_OTHER、Nice 0**（无 RT 线程在跑） | mc 的 SCHED_RR:80 为预设未启用（见上） |
+| 调度策略 | 业务线程绝大多数 **SCHED_OTHER、Nice 0**；例外：**mc 3 线程 + device_manager 6 线程为 SCHED_RR（rtprio 80/85）**，分别钉 CPU3/CPU2（§2.4 实测）；另有内核 FF 线程与 rtkit-daemon | mc 的 `AIMRTE_THREAD_SETTING_*=[2,3]\|SCHED_RR:80` 环境预设确有生效线程（`rt_*` 命名线程显式创建为 RR，尽管 `SUB_NO_SCHEDULER=true`） |
 | CPU 亲和性 | 普通进程 `0,1,4-7`（isolcpus=2,3）；**mc 36 线程钉 CPU3**；**CAN0/CAN1 中断(irq83/84)+rk_timer 钉 CPU2** | §2.4 实测一致 |
 | cgroup CPUWeight | `robot.slice` 10000 → realtime **10000**（+**MemoryMin=500MB**）/ system 5000 / interaction 3000 / auxiliary 500 + **CPUQuota 40%**（cpu.max=40000/100000） | realtime=mc+device_manager；interaction=agent+display_ui+audio_manager+task_engine；auxiliary=data_exporter；其余 → robot_system |
 | 守护优先级 | em.service Restart=always/5s；iox-roudi OOMScoreAdjust=-1000（最后被杀）；process_manager 按配置重启子应用 | hds+sys_guard 健康诊断兜底 |
