@@ -1014,6 +1014,54 @@ flowchart LR
     TE -.->|"interaction/state ★ 任务状态"| LUM
 ```
 
+**时序图（纵向=时间；实线=请求，虚线=返回；每条消息标注接口类型：Service=ROS2 服务 / Topic=单向广播 / FuncCall=板内函数调用）**：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant AG as Agent (/aimrt_agent_node)
+    participant LLM as 云端 aiem-gw（LLM pipeline）
+    participant TE as task_engine (/task_engine)
+    participant MC as MC (/mc_ros2_node · CPU3)
+    participant AUDIO as audio_manager
+    participant DISP as display_ui 胸屏
+    participant HAL0 as hal_sensor soc0
+
+    U->>AG: 语音「请跳个舞」（4+2ref 麦克风阵列）
+    Note over AG: 板内 FuncCall 链：omnis AEC(MNN)→silero VAD(ORT)→讯飞 ESR 识别
+    AG->>LLM: FuncCall HTTPS /v1/session（多模态会话请求）
+    Note over AG,LLM: 实测往返 ~62s（意图判定+话术生成）
+    LLM-->>AG: 意图=跳舞 + 话术 + TTS 音频流(opus)
+    AG->>TE: Topic /aima/agent/semantic_intent（SemanticIntent：动作意图·跳舞）【单向广播，无返回】
+    AG->>AUDIO: FuncCall PipeWire TCP 6001（播放 opus 话术）
+    AUDIO-->>AG: Topic /aima/hal/audio/play_state（PlayStateChange：播放中→完成）
+    TE->>TE: FuncCall AmRequest 仲裁（rule whole_body：姿态/电量/白名单校验→放行）
+    TE->>MC: Service ★SetMcAction（action=101 起身至四足站立，趴卧前置）
+    MC-->>TE: CommonTaskResponse{task_id, state=SUCCESS}
+    MC->>TE: Topic ★/aima/mc/common/state（action_info：READY_STAND(115)→STAND(101)，switch_ready=true）
+    TE->>MC: Service ★SetMcAction（action=109 QUADRUPED_LOCOMOTION_DANCE）
+    MC-->>TE: CommonTaskResponse{task_id, state=SUCCESS}
+    loop 跳舞执行 ~18s（1kHz 控制环）
+        MC->>MC: FuncCall onnxruntime.Run（rl/quad_walk_dance→t2_quad_twist_xy.onnx）
+        Note over MC: 关节指令→CAN@CPU2→14 执行器（不出 DDS）
+    end
+    par 并行表现（与跳舞同时下发）
+        TE->>DISP: Service PlayEmotion（emotion_ids=舞蹈表情组）
+        DISP-->>TE: CommonResponse{code=0}
+    and
+        TE->>HAL0: Service ★LedStripCommand（led_strip_mode=4 舞蹈灯语）
+        HAL0-->>TE: CommonResponse{code=0}
+    and
+        MC->>TE: Topic ★/aima/mc/common/state（motion_status：RUNNING→完成）
+    end
+    MC->>TE: Topic ★mc/common/state（变形 11→BIPED_LOCOMOTION_WBC(300) 收势）
+    TE->>AG: Service ★PlayTts（tts_req：完成播报）
+    AG-->>TE: PlayTtsResponse{trace_id}
+    AG->>AUDIO: FuncCall PipeWire（播放完成话术）
+    Note over TE: Topic /aima/interaction/state★（任务状态广播→App/云镜像）
+```
+
 读图要点（实测佐证）：
 1. **语义往返 ~62s**：语音指令到首个动作（起身）间隔 62s，为云端 LLM 会话（含意图判定与话术生成）+ 任务仲裁链路的总时延；本地链路（Agent→TE→MC）毫秒级。
 2. **跳舞本体是 RL 策略**：`QUADRUPED_LOCOMOTION_DANCE(109)` 映射 `rl/quad_walk_dance.yaml`→onnxruntime 在隔离核 CPU3 实时推理（动作库含 `douyin_3500`、`q1_danceGo`、`q1_ladingwu2` 等多种舞曲策略，另有 CSV 轨迹模仿舞 `BIPED_MIMIC_DANCE_*`）。
@@ -1068,6 +1116,84 @@ flowchart LR
     MC ==>|"held_state: McHandHeldState<br/>(LEFT/RIGHT_HELD · is_held)"| TE
     MC -- "WBC 牵行关节指令" --> CAN
     MC ==>|"★ mc/common/state(held_state/is_moving)"| TE
+```
+
+**时序图（接口/返回值明细）**：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant AG as Agent (/aimrt_agent_node)
+    participant TE as task_engine (/task_engine)
+    participant MC as MC (/mc_ros2_node · CPU3)
+    participant HAL0 as hal_sensor soc0
+
+    U->>AG: 语音「趴下」（板内语音链同 UC1）
+    Note over AG: 意图获取：云端 LLM 或本地 NLU 规则（nlu_rules.json，FuncCall）
+    AG->>TE: Topic /aima/agent/semantic_intent（姿态意图·趴下）【单向广播】
+    HAL0->>TE: Topic ★/aima/hal/bms/state（Bms：remaining_capacity_percentage，门控数据源）
+    TE->>TE: FuncCall AmRequest 仲裁（rule posture.yaml）<br/>校验：allow_held_state=false（牵手拒绝）/posture_exemptions(4)=电量充电豁免→放行
+    TE->>MC: Service ★SetMcAction（action=110 趴下；双足时 MC 内先变形 21）
+    MC-->>TE: CommonTaskResponse{task_id, state=SUCCESS}
+    loop 变形+趴下 ~5s（实测 21→110）
+        MC->>MC: FuncCall onnxruntime.Run（姿态 RL 策略）
+    end
+    MC->>TE: Topic ★/aima/mc/common/state（action 完成，posture=趴卧）
+    Note over U,MC: —— 用户再说「站起来」 ——
+    U->>AG: 语音「站起来」
+    AG->>TE: Topic /aima/agent/semantic_intent（姿态意图·四足站立）【单向】
+    TE->>MC: Service ★SetMcAction（action=101 四足站立；MC 内先 READY_STAND(115) 预备）
+    MC-->>TE: CommonTaskResponse{task_id, state=SUCCESS}
+    loop 起立 ~5s（实测 115→101→102）
+        MC->>MC: FuncCall onnxruntime.Run（起立 RL 策略）
+    end
+    MC->>TE: Topic ★/aima/mc/common/state（STAND(101)→LOCOMOTION(102)，posture=四足站立）
+    TE->>AG: Service ★PlayTts（tts_req：完成播报）
+    AG-->>TE: PlayTtsResponse{trace_id}
+```
+
+**时序图（接口/返回值明细）**：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant AG as Agent (/aimrt_agent_node)
+    participant TE as task_engine (/task_engine)
+    participant PTR as person_track（orin·GPU）
+    participant FLW as follow_node（orin）
+    participant ODOM as legged_odom（rk）
+    participant MC as MC (/mc_ros2_node · CPU3)
+
+    U->>AG: 语音「跟着我」
+    AG->>TE: Topic /aima/agent/semantic_intent（跟随意图）【单向广播】
+    TE->>TE: FuncCall AmRequest 仲裁（rule follow.yaml：电量≥6%、odom 可信）→放行
+    TE->>PTR: Service /perception/set_follow_perception_task（trigger=启动）
+    PTR-->>TE: CommonResponse{code=0}
+    TE->>FLW: Service SetFollowTaskBiped（跟随任务参数）
+    FLW-->>TE: CommonResponse{code=0}
+    ODOM->>PTR: Topic /odom·/tf（里程计，跟踪坐标系）【单向】
+    loop 目标搜索（本例持续未锁定）
+        PTR->>PTR: FuncCall TensorRT 推理（yolov8s-seg 检测 + clip_reid/swin ReID）
+        PTR-->>TE: Topic ★/perception/follow_candidates（PerceptionFollow 归一化框；本例为空）
+    end
+    FLW->>TE: Topic ★/aima/algo/follow/state（FollowState：state=1 未发现目标）
+    Note over TE,FLW: 视觉速度路径未激活：FLW 不发 velocity，<br/>MC 输入源未被 follow 抢占（SetMcInputSource 未生效）
+    U->>MC: 牵手（物理接触·非 ROS：MC 关节力矩感知）
+    MC-->>TE: Topic ★/aima/mc/common/state（held_state：McHandHeldState=LEFT_HELD_ONLY，is_held=true）
+    TE->>TE: FuncCall 任务门控（allow_held_state=false：牵手时拒绝姿态/示教类 8 种任务）
+    MC->>MC: FuncCall 变形（QUADRUPED_TO_BIPED_ROTATE(11)→BIPED_LOCOMOTION_WBC(300)）
+    loop 牵手带步 3~4 分钟（力导引，人主导）
+        U->>MC: 牵引（速度/方向由人施加）
+        MC->>MC: FuncCall onnxruntime.Run（双足 WBC 步态，1kHz 环）<br/>注：不经 /aima/mc/locomotion/velocity
+    end
+    U->>TE: 结束跟随（语音/手动）
+    TE->>FLW: Service SetFollowTaskBiped（trigger=停止）
+    FLW-->>TE: CommonResponse{code=0}
+    TE->>PTR: Service /perception/set_follow_perception_task（trigger=停止）
+    PTR-->>TE: CommonResponse{code=0}
+    FLW->>TE: Topic ★/aima/algo/follow/state（state=0 空闲）
 ```
 
 读图要点（本例为「未锁定目标的牵手带步」）：
