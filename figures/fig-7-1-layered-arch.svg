@@ -91,20 +91,21 @@
 <rect x="20" y="630" width="84" height="126" rx="6" fill="#f5eff7" stroke="#9aa8b5" stroke-width="1"/>
 <text x="42" y="697" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">驱动层</text>
 <rect x="128" y="630" width="354" height="126" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
-<text x="138" y="649" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_camera：头部相机(ox05bis)+IMU 直连</text>
-<text x="138" y="666" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">exposure：5×ToF 曝光/板间同步（控制面）</text>
-<text x="138" y="683" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">配件：rc · 圈圈 · insta360 · resource_manager</text>
-<text x="138" y="700" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_sensor：★bms/touch · SetServo · 灯语</text>
-<text x="138" y="717" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">驱动：Mali kbase · RKNPU v0.9.8 · rkcif</text>
-<text x="138" y="734" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">+max96724 · CAN/stmmac · I2C/SPI/UART · MPP/RGA</text>
+<text x="138" y="649" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_camera→ox05bis 左目：Agent 人脸/手势@NPU</text>
+<text x="138" y="666" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">└ nv12_l→rtsp 供 App 看相机 · BMI08 IMU</text>
+<text x="138" y="683" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">exposure：5×ToF 曝光/板间同步（控制面）</text>
+<text x="138" y="700" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">配件：rc · 圈圈 · insta360 · resource_manager</text>
+<text x="138" y="717" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_sensor：★bms/touch · SetServo · 灯语</text>
+<text x="138" y="734" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">驱动：Mali/RKNPU · rkcif+max96724 · MPP/RGA</text>
 <rect x="518" y="630" width="258" height="126" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
 <text x="528" y="649" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CAN0/1 驱动（硬中断 irq83/84@CPU2）</text>
 <rect x="822" y="630" width="296" height="126" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
-<text x="832" y="649" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_rgbd：5 目 ToF 数据面（ofilm 直连）</text>
-<text x="832" y="666" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_camera：2×5MP RGB（x5b 直连）</text>
-<text x="832" y="683" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_sensor_soc1：ADU/温度</text>
-<text x="832" y="700" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">驱动：nvgpu 540.4.0 · V4L2/NvArgus</text>
-<text x="832" y="717" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">NVDEC/NVENC · 千兆以太</text>
+<text x="832" y="649" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_camera→x5b 双目：percep 检测/分割@TRT</text>
+<text x="832" y="666" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">→ /percep/cloud·detect → Nav2/跟随</text>
+<text x="832" y="683" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_rgbd：5 目 ToF 数据面（ofilm 直连）</text>
+<text x="832" y="700" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">→ 点云→coreon_fusion 融合/避障</text>
+<text x="832" y="717" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">hal_sensor_soc1：ADU/温度</text>
+<text x="832" y="734" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">驱动：nvgpu · NvArgus · NVDEC · 千兆以太</text>
 <rect x="20" y="782" width="84" height="112" rx="6" fill="#fdeee6" stroke="#9aa8b5" stroke-width="1"/>
 <text x="42" y="842" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">硬件层</text>
 <rect x="118" y="782" width="668" height="112" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>

@@ -108,18 +108,20 @@ os_c3 = [('Ubuntu 22.04.5 · L4T R36.4.4', False),
          ('（JetPack 6.2）· systemd · NV 多媒体栈', False),
          ('（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l', False)]
 # 驱动层：传感直连内容在前（以传感为重），底层驱动在后
-dr_c1 = [('hal_camera：头部相机(ox05bis)+IMU 直连', False),
+# 驱动层：传感直连在前（hal_camera 显式标注所连相机与视频流用途，→ 为板内流路径），底层驱动在后
+dr_c1 = [('hal_camera→ox05bis 左目：Agent 人脸/手势@NPU', False),
+         ('└ nv12_l→rtsp 供 App 看相机 · BMI08 IMU', False),
          ('exposure：5×ToF 曝光/板间同步（控制面）', False),
          ('配件：rc · 圈圈 · insta360 · resource_manager', False),
          ('hal_sensor：★bms/touch · SetServo · 灯语', False),
-         ('驱动：Mali kbase · RKNPU v0.9.8 · rkcif', False),
-         ('+max96724 · CAN/stmmac · I2C/SPI/UART · MPP/RGA', False)]
+         ('驱动：Mali/RKNPU · rkcif+max96724 · MPP/RGA', False)]
 dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84@CPU2）', False)]
-dr_c3 = [('hal_rgbd：5 目 ToF 数据面（ofilm 直连）', False),
-         ('hal_camera：2×5MP RGB（x5b 直连）', False),
+dr_c3 = [('hal_camera→x5b 双目：percep 检测/分割@TRT', False),
+         ('→ /percep/cloud·detect → Nav2/跟随', False),
+         ('hal_rgbd：5 目 ToF 数据面（ofilm 直连）', False),
+         ('→ 点云→coreon_fusion 融合/避障', False),
          ('hal_sensor_soc1：ADU/温度', False),
-         ('驱动：nvgpu 540.4.0 · V4L2/NvArgus', False),
-         ('NVDEC/NVENC · 千兆以太', False)]
+         ('驱动：nvgpu · NvArgus · NVDEC · 千兆以太', False)]
 hw_c1 = [('业务核 = 4×A72 大核 + 2×A53 小核', True),
          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
          ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45', False),
