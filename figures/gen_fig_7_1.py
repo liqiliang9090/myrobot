@@ -66,8 +66,8 @@ row_y = []
 _y = PART_Y + PART_TITLE_H                            # 150
 for h in ROW_H:
     row_y.append(_y); _y += h + 4
-PART_BOT = row_y[-1] + ROW_H[-1] + 8                  # 底部留 8px，部分框完整包住子框
-CELL_PAD = 6                                          # 部分框内子框横向内缩
+PART_BOT = row_y[-1] + ROW_H[-1] + 12                 # 底部留 12px，部分框完整包住子框
+CELL_PAD = 12                                         # 部分框内子框横向内缩（显示缩放下仍明显包住）
 HW_Y = PART_BOT + 14                                  # 680
 HW_BOT = HW_Y + HW_H                                  # 768
 BOARD_BOT = HW_BOT + PAD                              # 776
@@ -83,12 +83,12 @@ BIZ_COLS = [
   ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'hal_camera：头部相机(ox05bis)+IMU 直连', 'exposure：5×ToF 曝光/板间同步（控制面）', '配件：rc · 圈圈 · insta360 · resource_manager']),
  ],
  [  # rk·运控：mc 对上暴露 ★接口；CPU2/CPU3 隔离核业务显式标注
-  ('mc 运动控制', ['★SetMcAction · velocity（指令下发）', '★mc/common/state（全量状态上报）', 'CPU3 独占：RL 策略 · WBC · 动作 FSM', 'CPU2：CAN 硬中断 + dm 设备 IO']),
-  ('device_manager 设备实时 IO', ['SCHED_RR 钉 CPU2 · realtime.slice', '（与 mc 同 slice，§2.4）']),
+  ('mc 运动控制', ['★SetMcAction·velocity（指令下发）', '★mc/common/state（全量状态）', 'CPU3 独占：RL·WBC·动作 FSM', 'CPU2：CAN 硬中断 + dm 设备 IO']),
+  ('device_manager 设备实时 IO', ['SCHED_RR 钉 CPU2', 'realtime.slice（§2.4）']),
  ],
  [  # orin：任务产出层在上，感知融合居中，传感数据源在下
   ('导航与跟随', ['Nav2 1.1.20（★navi 指令/地图加载）', 'follow_node（★follow/state）', 'trajectory_tracker（环绕运镜）']),
-  ('感知与融合', ['percep（分割/深度/检测@TRT）', 'coreon_fusion（27 路融合）', 'person_track+ReID（★follow_candidates）', 'brightness · nav2_perception（点云合并）']),
+  ('感知与融合', ['percep（分割/深度/检测@TRT）', 'coreon_fusion（27 路融合）', 'person_track+ReID', '（★follow_candidates）', 'brightness · 点云合并']),
   ('传感接入', ['hal_rgbd 5 目 ToF 数据面（ofilm 直连）', 'hal_camera 2×5MP RGB（x5b 直连）', 'hal_sensor_soc1（ADU/温度）']),
  ],
 ]
@@ -109,11 +109,13 @@ os_c2 = [('无 PREEMPT_RT · isolcpus=2,3 隔离', False),
 os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）', False),
          ('systemd · NV 多媒体栈', False),
          ('（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l', False)]
-dr_c1 = [('Mali kbase · RKNPU v0.9.8 · CAN · stmmac+YT9215RB', False), ('V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA', False)]
-dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84 @CPU2）', False)]
-dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机', False),
-         ('（ox05bis/max96724）· NVDEC/NVENC', False),
-         ('千兆以太', False)]
+dr_c1 = [('Mali kbase · RKNPU v0.9.8 · CAN · stmmac', False),
+         ('rkcif+max96724 GMSL · V4L2/USB · I2C/SPI/UART', False),
+         ('MPP/RGA · YT9215RB 交换芯片驱动', False)]
+dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84@CPU2）', False)]
+dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus', False),
+         ('OFILM GMSL：x5b RGB + tof/tofb 5×ToF', False),
+         ('NVDEC/NVENC · 千兆以太', False)]
 hw_c1 = [('业务核 = 4×A72 大核 + 2×A53 小核', True),
          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
          ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45', False),
@@ -123,7 +125,7 @@ hw_c2 = [('隔离小核 ×2（CPU2/CPU3）', True),
          ('CPU3：MC 运控独占（36 线程）', False),
          ('CAN0/1 总线 → 14× 关节执行器 + MCU', False)]
 hw_c3 = [('Orin（6×A78AE · Ampere 1024CUDA+32TC）', False),
-         ('统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G', False),
+         ('LPDDR5 8GB · 102.4GB/s · NVMe 238.5G', False),
          ('OFILM GMSL 模组：2×5MP RGB + 5 目 ToF', False)]
 
 ROWS = [('具身框架层', (fw_c1, fw_c2, fw_c3)),
@@ -201,7 +203,7 @@ for ri, (lname, cont) in enumerate(ROWS):
     if ri == 1:
         # OS 层：rk 两列同属一个 Ubuntu 22.04.5 实例 → 外包统一框（落在运控板框内）
         WH = 24
-        S.append(box(112, yt, 680, h, 'none', '#5b87b5', 1.8, rx=6))
+        S.append(box(118, yt, 668, h, 'none', '#5b87b5', 1.8, rx=6))
         t, _ = text_block(0, yt + 16, [('Ubuntu 22.04.5', True)], fs=12,
                           color='#1c3d5f', center=452, maxw=660)
         S.append(t)
@@ -233,7 +235,7 @@ t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=13, color='
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 WHW = 24
-S.append(box(112, HW_Y, 680, HW_H, 'none', '#5b87b5', 1.8, rx=6))
+S.append(box(118, HW_Y, 668, HW_H, 'none', '#5b87b5', 1.8, rx=6))
 t, _ = text_block(0, HW_Y + 16, [('rk3576 SoC · 8 核 = 4 大核（A72）+ 4 小核（A53）', True)],
                   fs=12, color='#1c3d5f', center=452, maxw=660)
 S.append(t)
