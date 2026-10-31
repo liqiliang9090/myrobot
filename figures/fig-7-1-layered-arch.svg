@@ -36,11 +36,12 @@
 <text x="131" y="399" font-family="Noto Sans CJK SC" font-size="13.6" fill="#17456e" font-weight="700">交互表现</text>
 <text x="131" y="418" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">audio_manager（★播放/音量）· display_ui 胸屏</text>
 <text x="131" y="435" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">lumina 灯效 · scene_engine 场景</text>
-<rect x="122" y="450" width="366" height="84" rx="5" fill="#e9f2fc" stroke="#4f7396" stroke-width="2"/>
+<rect x="122" y="450" width="366" height="101" rx="5" fill="#e9f2fc" stroke="#4f7396" stroke-width="2"/>
 <text x="131" y="471" font-family="Noto Sans CJK SC" font-size="13.6" fill="#17456e" font-weight="700">传感与外设</text>
 <text x="131" y="490" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_sensor（★bms/touch · SetServo · 灯语）</text>
-<text x="131" y="507" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">配件：rc · 圈圈 · insta360 · resource_manager</text>
-<text x="131" y="524" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">相机配套：hal_camera(rk) 供电/管理 · 曝光 · rtsp</text>
+<text x="131" y="507" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_camera：头部相机(ox05bis)+IMU 直连</text>
+<text x="131" y="524" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">exposure：5×ToF 曝光/板间同步（控制面）</text>
+<text x="131" y="541" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">配件：rc · 圈圈 · insta360 · resource_manager</text>
 <rect x="506" y="150" width="282" height="420" rx="6" fill="#f7fafe" stroke="#a8b4c0" stroke-width="1"/>
 <rect x="512" y="158" width="270" height="84" rx="5" fill="#e9f2fc" stroke="#4f7396" stroke-width="2"/>
 <text x="521" y="179" font-family="Noto Sans CJK SC" font-size="13.6" fill="#17456e" font-weight="700">mc 运动控制</text>
@@ -65,8 +66,8 @@
 <text x="811" y="338" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">brightness · nav2_perception（点云合并）</text>
 <rect x="802" y="353" width="308" height="84" rx="5" fill="#e9f2fc" stroke="#4f7396" stroke-width="2"/>
 <text x="811" y="374" font-family="Noto Sans CJK SC" font-size="13.6" fill="#17456e" font-weight="700">传感接入</text>
-<text x="811" y="393" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_rgbd 头部 5 目 ToF（直连）</text>
-<text x="811" y="410" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_camera 相机阵列 + 头部 IMU（直连）</text>
+<text x="811" y="393" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_rgbd 5 目 ToF 数据面（ofilm 直连）</text>
+<text x="811" y="410" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_camera 2×5MP RGB（x5b 直连）</text>
 <text x="811" y="427" font-family="Noto Sans CJK SC" font-size="12.6" fill="#2c3a47">hal_sensor_soc1（ADU/温度）</text>
 <rect x="20" y="574" width="92" height="78" rx="6" fill="#f0f7ea" stroke="#9aa8b5" stroke-width="1"/>
 <text x="34" y="617" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">具身框架层</text>
@@ -115,7 +116,8 @@
 <rect x="116" y="870" width="378" height="84" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
 <text x="126" y="887" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">业务核 = 4×A72 大核 + 2×A53 小核</text>
 <text x="126" y="904" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB</text>
-<text x="126" y="921" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">eMMC 116.5G · WiFi/BT · YT9215RB+RJ45 · 本体传感器</text>
+<text x="126" y="921" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">eMMC 116.5G · WiFi/BT · YT9215RB+RJ45</text>
+<text x="126" y="938" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">头部相机+IMU · 本体传感（GMSL/rkcif 直连）</text>
 <rect x="506" y="870" width="282" height="84" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
 <text x="516" y="887" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">隔离小核 ×2（CPU2/CPU3）</text>
 <text x="516" y="904" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CPU2：CAN0/1 硬中断 + dm 实时线程</text>
@@ -124,7 +126,7 @@
 <rect x="796" y="846" width="320" height="112" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
 <text x="806" y="890" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Orin（6×A78AE · Ampere 1024CUDA+32TC）</text>
 <text x="806" y="907" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G</text>
-<text x="806" y="924" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">头部相机阵列（双目/鱼眼/彩色/5目ToF）</text>
+<text x="806" y="924" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">OFILM GMSL 模组：2×5MP RGB + 5 目 ToF</text>
 <rect x="1140" y="96" width="400" height="870" rx="10" fill="#fffdf4" stroke="#c9a24b" stroke-width="1.2"/>
 <text x="1222" y="118" font-family="Noto Sans CJK SC" font-size="13" fill="#7a5c14" font-weight="700">◆ 工具链（纵贯两板 · 版本见 §6.1）</text>
 <rect x="1148" y="132" width="384" height="150" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
@@ -162,5 +164,5 @@
 <line x1="1140" y1="1020" x2="1116" y2="1020" stroke="#35495e" stroke-width="1.3" stroke-dasharray="5,4"/><polygon points="1116,1020 1125,1016 1125,1024" fill="#35495e"/><polygon points="1140,1020 1131,1024 1131,1016" fill="#35495e"/>
 <text x="20" y="1076" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。</text>
 <text x="20" y="1092.6" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">业务层模块框序：自上而下＝依赖方向（上＝对外接口/依赖方，下＝被依赖底座与数据源）。</text>
-<text x="20" y="1109.1999999999998" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。</text>
+<text x="20" y="1109.1999999999998" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；相机/ToF 原图均板内 iceoryx 消化不跨板：rk 头部相机→Agent 视觉/rtsp·App，orin GMSL 模组→感知融合；ToF 控制面在 rk（exposure）、数据面在 orin。</text>
 </svg>

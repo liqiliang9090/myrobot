@@ -233,7 +233,7 @@ systemd
 | `aimrt_main`（t1_v2d0_config.yaml） | run | 设备管理器 device_manager | `/device_manager_node`（cwd=/robot/software/device_manager/bin 实证） |
 | `aimrt_main`（audio_manager.yaml） | run | 音频管理（麦克风阵列/播放/音乐） | `/audiomanager_ros2_node` |
 | `aimrt_main`（hal_sensor_t1_v2d0_cfg.yaml） | run | 传感器 HAL（BMS/触摸/灯/舵机/颈部灯，soc0 侧） | `/hal_sensor_soc0` |
-| `aima-hal_camera-app-main`（rk 配置） | run | 相机 HAL（rk 侧摄像头供电/管理） | 图上未见 ROS 节点（iceoryx 为主） |
+| `aima-hal_camera-app-main`（rk 配置） | run | **相机 HAL：头部相机直连采集**（ox05bis 5MP 经 max96724 GMSL→rkcif，2592×1944@10fps，fuser 实证持有 /dev/video0-1）+ **BMI08 头部 IMU**（/dev/bmi08_imu）；帧经 iceoryx/dmabuf 板内分发（Agent 视觉/rtsp） | 图上未见 ROS 节点（图像走 iceoryx，2026-10-31 板上实证） |
 | `aima-hds-app`（hds_master.yaml） | root | 健康诊断服务 HDS（故障码汇总/告警） | `/hds` |
 | `flutter-pi --release -r 180 display_ui` | root | 胸屏 Flutter UI 渲染 | 非 ROS 进程 |
 | `aima-legged_odom-app` | run | 足式里程计（odom/tf/躯干位姿） | `/legged_odom_node` |
@@ -263,8 +263,8 @@ systemd
 | `process_manager` | root | 同 rk（soc1 实例） | `/process_manager1` |
 | `sys_guard` | root | 系统守护（soc1 侧） | `/sys_guard_node_soc1` |
 | `aimrt_main`（hal_sensor_orin_t1_cfg.yaml） | run | 传感器 HAL（ADU 电源板/温度，soc1 侧） | `/hal_sensor_soc1` |
-| `aimrt_main`（t1_v2d1_config.yaml，hal_rgbd） | run | RGBD/ToF 相机 HAL（头部 5 目 ToF：main/front/rear/left/right） | `/hal_rgbd_node` + `/hal_rgbd_node_0`（cwd=hal_rgbd/bin 实证） |
-| `aima-hal_camera-app-main`（orin 配置） | run | 相机 HAL（orin 侧：双目/鱼眼/中央彩色相机 + 头部 IMU） | `/hal_camera` + `/hal_camera_1` |
+| `aimrt_main`（t1_v2d1_config.yaml，hal_rgbd） | run | RGBD/ToF 相机 HAL——**5 目 ToF 数据面**（ofilm_tof/tofb GMSL 驱动，fuser 实证持有 /dev/video2-7；main/front/rear/left/right） | `/hal_rgbd_node` + `/hal_rgbd_node_0`（cwd=hal_rgbd/bin 实证） |
+| `aima-hal_camera-app-main`（orin 配置） | run | 相机 HAL——2× ofilm_x5b 5MP RGB（2592×1944 UYVY，GMSL 直连，fuser 实证持有 /dev/video0-1；ToF 曝光控制面在 rk 侧 exposure）；imu_head 由 rk 侧发布（本板配置中已注释） | `/hal_camera` + `/hal_camera_1`（图像走 iceoryx，ROS 侧 0 发布者） |
 | `aimrt_main`（aimrt_person_track_config_T.yaml） | run | 人体跟踪感知（跟随候选目标检测） | `/aimrt_person_track_node` + `/aimrt_person_track_srv` |
 | `aimrt_main`（aimrt_brightness_status_config_T.yaml） | run | 亮度检测（跟随过暗门控） | `/aimrt_brightness_status_node` + `/aimrt_brightness_status_srv` |
 | `coreon_fusion` | run | 多传感器融合（5×ToF+相机+IMU+UWB → 融合点云/目标/避障状态） | `/coreon_fusion_ros2_node` |
@@ -306,9 +306,9 @@ systemd
 | **mc_app_main（CPU3 独占）** | `/mc_ros2_node` | 4 | 2 | 13 | 0 |
 | aim_sm_app | `/sm` | 3 | 2 | 4 | 28 |
 | aima-agent-app | `/aimrt_agent_node` | 15 | 8 | 18 | 24 |
-| （管家/云属性桥，推断） | `/HK_ros2_rpc_node` | 0 | 0 | 1 | 1 |
+| （管家/云属性桥，实证） | `/HK_ros2_rpc_node` | 0 | 0 | 1 | 1 |
 | task_engine | `/task_engine` | 12 | 39 | 30 | 51 |
-| （任务触发链路，推断 task_engine 侧） | `/task_trigger_ros2_node` | 0 | 3 | 0 | 1 |
+| （任务触发链路，实证=Agent 交互触发） | `/task_trigger_ros2_node` | 0 | 3 | 0 | 1 |
 | aimrt_main（t1_v2d0，device_manager） | `/device_manager_node` | 1 | 0 | 0 | 1 |
 | aimrt_main（audio_manager） | `/audiomanager_ros2_node` | 9 | 1 | 15 | 1 |
 | aimrt_main（hal_sensor soc0） | `/hal_sensor_soc0` | 6 | 2 | 9 | 0 |
@@ -349,7 +349,7 @@ systemd
 | nav2_perception | `/pointcloud_combiner_node`、`/perception_node`、`/lifecycle_manager_t1_perception` | 见 4.4 | | | |
 | data_exporter（soc1 实例） | `/data_exporter` ① | 1 | 0 | 12 | 10 |
 | aima_ota_slave_app | `/ota_slave` | 2 | 0 | 2 | 0 |
-| （进程未确证，订阅 trro 专用通道） | `/trro_recv_dedicated` | 0 | 1 | 0 | 0 |
+| （App 通道接收器，随 app_proxy 域，实证） | `/trro_recv_dedicated` | 0 | 1 | 0 | 0 |
 
 ### 4.3 各节点完整接口挂载（rk 侧业务节点）
 
@@ -436,7 +436,7 @@ systemd
 
 **`/hal_rgbd_node` + `/hal_rgbd_node_0`（hal_rgbd）**：发布 5 路 `ofilm/tof/*/sensor_info`（RgbdInfo：曝光/温度）、`ofilm/tof/inter_board`、diagnostic、sm/node_state；订阅 10 路 `ofilm/tof/*/raw_record|rrf_record`（录制开关）；服务端 `SetHalTofStream`、`SmNodeService/hal_rgbd/…`
 
-**`/hal_camera` + `/hal_camera_1`（hal_camera orin）**：`/hal_camera` 发布 `hal/camera/module_info`、`hal/imu/imu_head`、`soc_sync/ready`；服务端 `CaptureJpegImage`★、`HALCameraCommand`；`/hal_camera_1` 服务端 `SetHalCameraStream`；两者共同订阅 `permission_state`（相机权限门控）、`mc/common/state`
+**`/hal_camera` + `/hal_camera_1`（hal_camera orin）**：`/hal_camera` 发布 `hal/camera/module_info`、`soc_sync/ready`；服务端 `CaptureJpegImage`★、`HALCameraCommand`；`/hal_camera_1` 服务端 `SetHalCameraStream`；两者共同订阅 `permission_state`（相机权限门控）、`mc/common/state`
 
 **`/aimrt_person_track_node` + `_srv`（person_track）**：发布 `perception/follow_candidates`（跟随候选）★、`perception/target_info`（Detection2DArray）、`follow_camera_lift_angle`、3 路调试（debug_cloud/image/markers）；订阅 `mc/common/state`、`odom`、`enable_follow`、`follow_target_selection`；服务端 `/perception/set_follow_perception_task`；客户端 `SetServo`（相机抬升）
 
@@ -460,9 +460,9 @@ systemd
 
 **`/sys_guard_node_soc1`（orin）**：同 soc0 结构（active_scene、diagnostic、sm/node_state）
 
-**`/trro_recv_dedicated`（归属未确证，orin 侧可见）**：订阅 `aima/app_proxy/trro_pull_message`（App 通道专用接收器）
+**`/trro_recv_dedicated`（实证：App 通道接收器，无独立进程＝app_proxy 域进程内节点）**：订阅 `aima/app_proxy/trro_pull_message`（App 通道专用接收器）
 
-**`/HK_ros2_rpc_node`（推断 rk 管家/云属性桥）**：服务端 `aimomp.protocol.DevicePropertyService/SetProperty`；客户端 `aimomp.protocol.CloudPropertyService/ReportProperty`（proto RPC 包装）
+**`/HK_ros2_rpc_node`（实证 rk 管家/云属性桥，2026-10-31 node info 复核）**：服务端 `aimomp.protocol.DevicePropertyService/SetProperty`；客户端 `aimomp.protocol.CloudPropertyService/ReportProperty`（proto RPC 包装：设备属性设置→上报云端）
 
 **辅助节点**：`/launch_ros_1692`（launch 进程自身）、8×`/transform_listener_impl_*`（各进程内 tf2 监听辅助节点）、`/bt_navigator_navigate_to_pose_rclcpp_node`（bt_navigator 内部桥）——非业务节点。
 
@@ -559,7 +559,7 @@ systemd
 | `/odom_torso` | nav_msgs/Odometry | 躯干（上半身）里程计 | 同上 | coreon_fusion 订阅 | 内部 |
 | `/torso_imu_orientation` | nav_msgs/Odometry | 躯干 IMU 航向（以里程计形式表达） | 同上 | coreon_fusion 订阅 | 内部 |
 | `/aima/hal/imu/torso/state` | sensor_msgs/Imu | 躯干 IMU 原始数据（仅订阅、发布者离线） | 标准 Imu（角速度/线加速度/姿态） | coreon_fusion 订阅 | 内部 HAL 通道 |
-| `/aima/hal/imu/imu_head` | sensor_msgs/Imu | 头部 IMU（hal_camera 发布） | 标准 Imu | 外部（仅发布） | 内部 |
+| `/aima/hal/imu/imu_head` | sensor_msgs/Imu | 头部 IMU（**rk** hal_camera/BMI08 发布，跨板可见；orin 配置中已注释） | 标准 Imu | 外部（仅发布） | 内部 |
 | `/tf`、`/tf_static` | tf2_msgs/TFMessage | 坐标变换树（map→odom 静态、base_link→相机/ToF 静态、odom→base_link 动态） | TFMessage（transforms[]） | 全图 9 订阅 | 4 个静态发布器 + legged_odom 动态发布 |
 | `/goal_pose` | geometry_msgs/PoseStamped | 导航目标点（仅订阅；nav2 标准入口） | `header`；`pose` | bt_navigator 订阅 | T1 业务侧走 `/navi/command` 服务 |
 | `/grid_map_origin` | nav_msgs/OccupancyGrid | 当前地图原点/元信息（map_server 发布） | 标准 OccupancyGrid | robot_navigation、costmap 订阅 | 内部 |
@@ -610,7 +610,7 @@ systemd
 | `/aima/hal/camera/head_stereo_left_orin` / `_right_orin` | Image | 头部双目（orin 处理流）左右目 | 标准 Image | coreon_fusion 订阅 | — |
 | `/aima/hal/camera/head_fisheye_left_orin` / `_right_orin` | Image | 头部左右鱼眼（orin 流） | 标准 Image | coreon_fusion 订阅 | — |
 | `/ofilm/tof/{main,front,rear,left,right}/sensor_info` | RgbdInfo | 5 路 ToF 模组信息 | `header`；`exposure` 曝光；`temperature` 温度 | coreon_fusion/融合链路订阅 | 与 `SetHalTofStream` 供电/出流控制配对 |
-| `/ofilm/tof/inter_board` | std_msgs/Bool | ToF 板间同步标志 | `data` | hal_rgbd_node_0 订阅 | — |
+| `/ofilm/tof/inter_board` | std_msgs/Bool | ToF 板间同步标志 | `data` | hal_rgbd_node_0 与 rk exposure 订阅 | rk↔orin ToF 采集同步 |
 | `/ofilm/tof/*/raw_record`、`/ofilm/tof/*/rrf_record`（×10） | Bool | 各 ToF 原始/RRF 录制开关（**仅订阅 = 二开可发**） | `data` | hal_rgbd 订阅 | 数据采集入口（录制约 /robot/persist） |
 | `/pmd_royale_ros_camera_node[_0..4]/point_cloud_0`（×5） | PointCloud2 | PMD Royale ToF 相机点云（仅订阅） | 标准点云 | coreon_fusion 订阅 | 驱动节点未上图（iceoryx 桥） |
 | `/metoak/camera/images/left`、`depth/left`、`point_cloud`（×3） | Image/PointCloud2 | Metoak 相机彩色/深度/点云（仅订阅） | 标准 | coreon_fusion 订阅 | 同上 |
@@ -1288,7 +1288,7 @@ sequenceDiagram
 | display_ui（flutter-pi 胸屏渲染） | interaction | 9.1 | **28.5** | 21.3 | 29.7 | 28.2 | 225 | **Mali GPU**（胸屏 2D/3D 渲染，rk GPU 占用主项） |
 | hal_camera（rk 侧相机 HAL） | system | 13.3 | 15.0 | 14.6 | 15.1 | 14.8 | 451 | MPP/RGA 硬件通路（VPU/RGA，非 GPU） |
 | lumina（灯效服务） | system | 10.9 | 12.0 | 12.3 | 12.2 | 13.2 | 92 | — |
-| hal_rgbd（rk 侧 ToF/RGBD HAL 实例①） | system | 9.0 | 10.2 | 9.8 | 10.1 | 10.0 | 40 | — |
+| hal_rgbd（rk 侧，实为曝光控制 exposure①） | system | 9.0 | 10.2 | 9.8 | 10.1 | 10.0 | 40 | — |
 | rc（体感遥控接入） | system | 6.2 | 7.0 | 6.8 | 7.1 | 6.8 | 52 | — |
 | ota（ota_master） | system | 4.8 | 5.2 | 5.2 | 5.2 | 5.1 | 68 | — |
 | cloud_proxy（云端代理） | system | 4.8 | 4.9 | 5.0 | 5.0 | 4.9 | 665④ | — |
@@ -1311,7 +1311,7 @@ sequenceDiagram
 | process_manager | 系统 | 0.5 | 0.7 | 0.7 | 0.7 | 0.7 | 46 | — |
 | 其他（ptp4l/hostapd/dnsmasq/chronyd/NetworkManager/secret_store 等） | 系统 | 各 <1 | | | | | ~120 合计 | — |
 
-① rk 侧亦部署 hal_rgbd 实例（soc0 manifest stage1 实含，§3.2 表未列，本次实测补录）。② 圈圈接入进程位于 connx 应用目录（`aimrt_main --cfg=quanji.yaml`）。③ RSS 主要为 iceoryx 共享内存段映射（全板共享），非私有内存。
+① rk 侧该进程实为 hal_rgbd 包内**曝光控制 exposure**（进程名 hal_rgbd；2026-10-31 实证：经 I2C/V4L2 直控 5×ToF 曝光并处理 inter_board 板间同步，持有 /dev/video2；soc0 manifest stage1 实含，§3.2 表未列，本次实测补录）。② 圈圈接入进程位于 connx 应用目录（`aimrt_main --cfg=quanji.yaml`）。③ RSS 主要为 iceoryx 共享内存段映射（全板共享），非私有内存。
 
 #### 6.3.2 orin 板：软件模块/进程级（列含义同 6.3.1）
 
@@ -1487,7 +1487,7 @@ sequenceDiagram
 
 **排版口径**：**纵向（列）**按部署域切分为三部分——运控板 rk 的「交互业务（非实时）」与「运控执行（实时）」两列 + 大脑板 orin 的「复杂感知与规划」一列；**横向（行）**自上而下为**具身业务层 → 具身框架层 → OS 层 → 驱动层 → 硬件层**五层（即自底向上：硬件→驱动→OS→框架→业务）；**最右侧为纵贯全部层级的「工具链」大框**。因 mermaid 自动布局无法锁定矩阵式行列顺序，本图由脚本生成 **SVG 矢量图**（`figures/gen_fig_7_1.py` → `figures/fig-7-1-layered-arch.svg`，仓库同时提供 PNG 版 `fig-7-1-layered-arch.png`），行列位置精确可控，并直接画出板内/跨板数据流与工具链注入连线。按 4+1 视图口径，**本图即逻辑视图**：以具身业务层的功能模块（职责+接口★）为主体，其下框架/OS/驱动层与硬件层作为物理承载一并框出（嵌套结构：**板框 ⊃ 部分框 ⊃ 业务/框架/OS/驱动四层；硬件层在板框内、部分框外**）；模块间接口协作另见 §7.4，场景串联见 §6.2。
 
-![图 7-1 逻辑视图（双板纵切 × 五层横切 × 工具链纵贯）](figures/fig-7-1-layered-arch.png?v=20261031d)
+![图 7-1 逻辑视图（双板纵切 × 五层横切 × 工具链纵贯）](figures/fig-7-1-layered-arch.png?v=20261031e)
 
 > **图 7-1 读法**：**板框**（运控板 rk3576 / 大脑板 Orin Nano）⊃ **部分框**（交互业务（非实时）/ 运控（实时｜隔离核）/ 复杂感知与规划，各含具身业务→框架→OS→驱动四层，上层依赖下层）（正文为缩略显示，点击图片可放大至原生分辨率）；**硬件层**在板框内、部分框正下方（**rk 侧两格外包统一框：rk3576 8 核＝4×A72 大核＋4×A53 小核**，内格细分业务核〔4×A72＋2×A53〕与 2×隔离小核 CPU2/CPU3）；**OS 层 rk 两列同属一个 Ubuntu 22.04.5 系统实例**（外包统一框，共享内核与系统服务）；**具身业务层内每模块独立成框，框序自上而下=依赖方向（上=对外接口/依赖方，下=被依赖底座与数据源）**；最右列为**工具链**纵贯（**开发工具 → 调测工具 → 三方依赖包**〔多媒体与图像 · UI 与音频 · 系统与网络服务〕）；**①②③通信线统一画在图底部**。
 > **连线与交互**（图上带编号的箭头）：**① 板内**（rk 业务⇄运控，iceoryx/DDS）——task_engine→★SetMcAction/velocity ↓，mc→★mc/common/state ↑；**② 跨板·任务与感知**（rk 业务⇄orin，内部以太网 10.1.1.0/24 · FastDDS 域 0）——FollowTaskCtrl/★navi 指令 ↓，★follow_candidates/点云/代价图、/odom·/tf ↑（只走结果级数据，相机原图板内消化）；**③ 跨板·速度直连**（orin→MC）——nav2/follow/运镜发布 velocity(pnc/follow)，MC 按 SetMcInputSource 仲裁；**外部接入**——App→app_proxy(TRRO/鉴权)、云→cloud_proxy(MQTT/TLS)、遥控器→rc(蓝牙)、圈圈→connx(BLE+UWB)、Insta360→insta360(WiFi)，全部终结于 rk；PC ★接口面 FastDDS 直连双板；**虚线**=工具链注入。模块级全量接口见 §7.4，连接视角见 §7.2。
@@ -1498,7 +1498,7 @@ sequenceDiagram
 2. **五层横切核对 ✅ 基本合理**，与板上实际栈一致，但有三点按事实修正/注记：① **ROS 2/AimRT/iceoryx/推理运行时归「具身框架层」而非 OS 层**——OS 层只放内核+systemd+系统服务；② **运控执行列没有独立 RT 内核**（无 PREEMPT_RT，靠 isolcpus+SCHED_RR，已在该列 OS 层如实标注）；③ 按 4+1 严格口径，硬件/驱动/OS 层属物理/过程视图成分，**逻辑视图本体=具身业务层的功能模块及其接口**（图中已为每个业务模块标注职责与代表接口★），纯逻辑协作图见 §7.4。
 3. **工具链框收拢为四块**（版本以 §6.1 实测为准）：**开发工具**（colcon+CMake 工作空间、AimRT RPC 代码生成、Rust 工具链）→ **调测工具**（ros2 CLI、tegrastats、jetson-stats 7.2.1、iox-introspection、ASan、AimRT monitor/viz）→ **运维链**（hds、cloud_proxy、ota、data_exporter、drp、abox）→ **三方依赖包**（外包「多媒体与图像 / UI 与音频 / 系统与网络服务」三组）；中间件与通信、AI 推理运行时、商业 SDK 三组不再单列成框——推理运行时要点已见于框架层单元格，完整版本与开源仓以 §6.1 为准。
 4. **跨板边界只走结果级数据**：rk↔orin 经内部以太网 FastDDS 域 0 交换目标/点云/代价图与任务指令；相机原图等大带宽在 orin 板内经 iceoryx 消化（§4.0）。
-5. **传感器直连拓扑核对（2026-10-31 复核归档数据）**：**orin 直连头部感知阵列**——`hal_camera`×2（双目/鱼眼/中央彩色相机 + 头部 IMU，GMSL/NvArgus 链路）与 `hal_rgbd`（头部 5 目 ToF：main/front/rear/left/right）均实证运行于 orin（§3.3/§4）；**rk 不直连 ToF**——rk 上无 ToF HAL 实例（`hal_rgbd` 目录下进程实为曝光控制 `exposure_config.yaml`），rk 直连的是本体传感（BMS/触摸/灯/舵机/颈部灯，`hal_sensor_soc0`）；rk 的相机类进程为**配套角色**：`hal_camera`(rk 配置)=摄像头供电/管理、`exposure`=曝光控制、`rtsp_server`=App 视频拉流（MPP 硬编码）、Agent 六个 RKNN 视觉模型消费帧。`soc_sync/ready`（双板相机同步就绪）话题佐证两板相机链路协作；**Agent 视觉/rtsp 的帧到达路径（rk 板内直采 vs 跨板传输）为未确证项，待板在线复核**。外部佐证：[欧菲光「七路融合感知」方案（双目 RGB + 5 路 ToF + 6 轴 IMU）](https://www.chinanews.com.cn/cj/2026/10-30/10723321.shtml)。
+5. **传感器直连拓扑（2026-10-31 板上实证：fuser/dmesg/配置三重核验）**：**运控板 rk 直连**——头部相机（ox05bis 5MP，max96724 GMSL→rkcif，hal_camera 持有 /dev/video0-1，2592×1944@10fps）+ **BMI08 头部 IMU** + **5 目 ToF 控制面**（hal_rgbd 包内 `exposure` 进程经 I2C（i2c-0/i2c-5）+ V4L2 直控 5 颗 ToF 曝光/滤波，并处理 `/ofilm/tof/inter_board` 板间同步）+ 本体传感（BMS/触摸/灯/舵机，hal_sensor_soc0）；图像经 iceoryx/dmabuf 板内供给 Agent 视觉（NPU 实测 Core0 25%/Core1 15% 常跑）与 rtsp_server（MPP 编码→App）。**大脑板 orin 直连**——OFILM GMSL 模组：2× ofilm_x5b 5MP RGB（2592×1944 UYVY，hal_camera 持有 video0-1）+ **5 目 ToF 数据面**（ofilm_tof/tofb 驱动，hal_rgbd 持有 video2-7→coreon_fusion 融合）+ ADU/温度（hal_sensor_soc1）。**跨板只走结果级数据与同步信号**（soc_sync/ready、inter_board、点云/目标/指令），图像话题 ROS 侧 0 发布者＝原图不跨板；ToF 为「控制面在 rk、数据面在 orin」分工。头部 IMU 归属修正：由 rk hal_camera 发布（orin 配置中 imu_head 已注释）。外部佐证：[欧菲光「七路融合感知」方案（双目 RGB + 5 路 ToF + 6 轴 IMU）](https://www.chinanews.com.cn/cj/2026/10-30/10723321.shtml)。
 5. **一套以太网、一个 ROS 2 域**：PC/rk/orin 同处 `10.1.1.0/24`（§1）；rk 是对外网关，**对外接入（App/云/遥控器/圈圈/Insta360）全部终结于运控板**。
 6. **两列同板共享 OS/驱动/硬件**：运控执行列的 OS/驱动/硬件层标注「与左列共享」及该列特有部分（隔离调度、CAN 中断、执行器总线），避免误解为独立系统。
 7. **与后文四节的对应**：§7.2 软件模块连接图为本图业务层的「模块—硬件—外部」连接视角；§7.3 模块清单的功能分组（交互与业务/系统与运维/传感与外设接入/实时运控/感知与融合/导航与跟随）即本图各列「具身业务层」内的分组；§7.4 为业务层的模块级接口展开；§7.5 为对应与校验。
@@ -1826,7 +1826,7 @@ flowchart LR
 1. **只读原则**：全程未对两板写入/重启/kill/服务调用（无 `ros2 service call`、无 `topic pub`、无参数修改）。`ros2 node/topic/service list` 属图发现查询；orin 侧复用了板上已存在的 ros2-daemon（pid 3066，非本次创建）。
 2. **已知副作用（向用户报备）**：rk 上一次 `ros2 node list` 曾把输出重定向到 `/tmp/.nl.txt`（空文件，重启即清）；rk 侧 `--no-daemon` 查询不落盘。除此之外无任何写入。
 3. **采集命令**（可复现）：`ssh t1pro_orin 'source /opt/docker/env.sh && ros2 node list'`、`ros2 topic list -v`、`ros2 service list -t`、`ros2 node info <node>`；定义文件位于板上 `/robot/software/interface/aimdk_msgs/share/aimdk_msgs/{msg,srv}[/<子系统>]` 与 `/robot/software/algorithm/aimdk_msgs/share/aimdk_msgs/`。
-4. **归属推断清单**（后续可实证的开放点）：`/HK_ros2_rpc_node`（推断=管家/云属性桥）、`/task_trigger_ros2_node`（推断=task_engine 侧）、`/trro_recv_dedicated`（进程未确证）、rk `aimrt_main(exposure)` 与 `hal_camera(rk)`、`scene_engine` 未在 ROS 图上出现（推断走 iceoryx）。
+4. **归属核实结果（2026-10-31 板上实证，原推断清单全部闭环）**：`/HK_ros2_rpc_node`＝管家/云属性桥（SetProperty 服务端 + CloudPropertyService/ReportProperty 客户端）；`/task_trigger_ros2_node`＝**Agent 交互触发链**（订阅 `/agent/task_operation`、`/aima/agent/face_info`、`/aima/interaction/state`，`TaskStatus` 服务客户端，无独立进程＝进程内节点——原推断 task_engine 侧有误）；`/trro_recv_dedicated`＝App 通道接收器（订阅 `trro_pull_message`，无独立进程，随 app_proxy 域）；rk `hal_camera(rk)`＝头部相机（ox05bis）+BMI08 IMU 直连采集（§3.2，图像走 iceoryx 故不在 ROS 图）；`exposure`＝5×ToF 曝光/板间同步控制面（I2C/V4L2 直控）；`scene_engine`＝ros2 通道订阅 `interaction/state`、`agent/face_info`（cfg 实证）。
 5. **版本基线**：采集于整机固件 `t2-3`（rk 设备树型号）/ orin JetPack（driver 540.4.0）；接口清单与该版本强相关。
 
 <a id="sec9"></a>

@@ -79,7 +79,7 @@ BIZ_COLS = [
   ('task_engine 任务引擎', ['AmRequest 仲裁 · 长任务编排']),
   ('SM 状态机', ['sm/system_state · SmNodeService 驱动各应用']),
   ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
-  ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', '配件：rc · 圈圈 · insta360 · resource_manager', '相机配套：hal_camera(rk) 供电/管理 · 曝光 · rtsp']),
+  ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'hal_camera：头部相机(ox05bis)+IMU 直连', 'exposure：5×ToF 曝光/板间同步（控制面）', '配件：rc · 圈圈 · insta360 · resource_manager']),
  ],
  [  # rk·运控：mc 对上暴露 ★接口，device_manager 为更底层设备 IO
   ('mc 运动控制', ['★SetMcAction · velocity（指令下发）', '★mc/common/state（全量状态上报）', 'RL 策略@CPU3 · WBC · 动作 FSM']),
@@ -88,7 +88,7 @@ BIZ_COLS = [
  [  # orin：任务产出层在上，感知融合居中，传感数据源在下
   ('导航与跟随', ['Nav2 1.1.20（★navi 指令/地图加载）', 'follow_node（★follow/state）', 'trajectory_tracker（环绕运镜）']),
   ('感知与融合', ['percep（分割/深度/检测@TRT）', 'coreon_fusion（27 路融合）', 'person_track+ReID（★follow_candidates）', 'brightness · nav2_perception（点云合并）']),
-  ('传感接入', ['hal_rgbd 头部 5 目 ToF（直连）', 'hal_camera 相机阵列 + 头部 IMU（直连）', 'hal_sensor_soc1（ADU/温度）']),
+  ('传感接入', ['hal_rgbd 5 目 ToF 数据面（ofilm 直连）', 'hal_camera 2×5MP RGB（x5b 直连）', 'hal_sensor_soc1（ADU/温度）']),
  ],
 ]
 
@@ -115,14 +115,15 @@ dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机', False),
          ('千兆以太', False)]
 hw_c1 = [('业务核 = 4×A72 大核 + 2×A53 小核', True),
          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
-         ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45 · 本体传感器', False)]
+         ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45', False),
+         ('头部相机+IMU · 本体传感（GMSL/rkcif 直连）', False)]
 hw_c2 = [('隔离小核 ×2（CPU2/CPU3）', True),
          ('CPU2：CAN0/1 硬中断 + dm 实时线程', False),
          ('CPU3：MC 运控独占（36 线程）', False),
          ('CAN0/1 总线 → 14× 关节执行器 + MCU', False)]
 hw_c3 = [('Orin（6×A78AE · Ampere 1024CUDA+32TC）', False),
          ('统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G', False),
-         ('头部相机阵列（双目/鱼眼/彩色/5目ToF）', False)]
+         ('OFILM GMSL 模组：2×5MP RGB + 5 目 ToF', False)]
 
 ROWS = [('具身框架层', (fw_c1, fw_c2, fw_c3)),
         ('OS 层', (os_c1, os_c2, os_c3)),
@@ -303,7 +304,7 @@ S.append(arrow(TC_X, AY2, C3_X + C3_W, AY2, dash='5,4', sw=1.3))
 t, _ = text_block(LBL_X, BOARD_BOT + 110, [
     ('图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。', False),
     ('业务层模块框序：自上而下＝依赖方向（上＝对外接口/依赖方，下＝被依赖底座与数据源）。', False),
-    ('列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。', False)],
+    ('列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；相机/ToF 原图均板内 iceoryx 消化不跨板：rk 头部相机→Agent 视觉/rtsp·App，orin GMSL 模组→感知融合；ToF 控制面在 rk（exposure）、数据面在 orin。', False)],
     fs=11.2, color='#5b6b7a', lh=16.6)
 S.append(t)
 
