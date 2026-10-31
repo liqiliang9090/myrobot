@@ -57,7 +57,7 @@ C3_X, C3_W = 796, 320                 # orin
 TC_X, TC_W = 1140, 400                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
-ROW_H = [530, 78, 102, 70]            # 业务(模块框化)/框架/OS(含外包框标题带)/驱动（部分框内四层）
+ROW_H = [420, 78, 102, 70]            # 业务(模块框化)/框架/OS(含外包框标题带)/驱动（部分框内四层）
 HW_H = 112                            # 硬件层（板框内、部分框外；rk 侧含外包框标题带）
 EXT_Y, EXT_H = 20, 46
 
@@ -73,25 +73,22 @@ BOARD_BOT = HW_BOT + PAD                              # 776
 
 # ---------- 内容 ----------
 BIZ_COLS = [
- [  # rk·交互业务：对外接口与依赖方在上，数据源与板基座在下
+ [  # rk·交互业务：对外接口与依赖方在上，数据源在下（运维链移入工具链列，板基座不画）
   ('housekeeper + app_proxy', ['App 接入鉴权 · 网络/蓝牙/权限（ConnectRobot）']),
   ('Agent 智能体', ['★asr_result/PlayTts · LLM 对话与意图']),
   ('task_engine 任务引擎', ['AmRequest 仲裁 · 长任务编排']),
   ('SM 状态机', ['sm/system_state · SmNodeService 驱动各应用']),
   ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
-  ('运维链', ['hds · cloud_proxy · ota · data_exporter', 'drp · abox']),
-  ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'legged_odom（/odom·/tf）· rk 相机/ToF 实例', '配件：rc · 圈圈 · insta360 · resource_manager']),
-  ('板基座', ['sys_guard · iox-roudi · tetherd · secret_store']),
+  ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', '配件：rc · 圈圈 · insta360 · resource_manager', '相机配套：hal_camera(rk) 供电/管理 · 曝光 · rtsp']),
  ],
  [  # rk·运控：mc 对上暴露 ★接口，device_manager 为更底层设备 IO
   ('mc 运动控制', ['★SetMcAction · velocity（指令下发）', '★mc/common/state（全量状态上报）', 'RL 策略@CPU3 · WBC · 动作 FSM']),
   ('device_manager 设备实时 IO', ['与 mc 同 realtime.slice（§2.4）', '9×SCHED_RR 钉隔离核']),
  ],
- [  # orin：任务产出层在上，感知融合居中，传感数据源与板基座在下
+ [  # orin：任务产出层在上，感知融合居中，传感数据源在下
   ('导航与跟随', ['Nav2 1.1.20（★navi 指令/地图加载）', 'follow_node（★follow/state）', 'trajectory_tracker（环绕运镜）']),
   ('感知与融合', ['percep（分割/深度/检测@TRT）', 'coreon_fusion（27 路融合）', 'person_track+ReID（★follow_candidates）', 'brightness · nav2_perception（点云合并）']),
-  ('传感接入', ['hal_rgbd 5目ToF · hal_camera 相机阵列+IMU', 'hal_sensor_soc1（ADU/温度）']),
-  ('板基座', ['sys_guard · ota_slave · data_exporter', '（部署未运行清单见 §6.4.2）']),
+  ('传感接入', ['hal_rgbd 头部 5 目 ToF（直连）', 'hal_camera 相机阵列 + 头部 IMU（直连）', 'hal_sensor_soc1（ADU/温度）']),
  ],
 ]
 
@@ -154,7 +151,7 @@ def draw_board(bx, bw, title, stroke):
     S.append(t)
 
 draw_board(C1_X - PAD, (C2_X + C2_W + PAD) - (C1_X - PAD),
-           '运动板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）', '#5b87b5')
+           '运控板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）', '#5b87b5')
 draw_board(C3_X - PAD, (C3_X + C3_W + PAD) - (C3_X - PAD),
            '大脑板 Orin Nano（6×ARM + Orin 67TOPS）', '#8d6fb4')
 
@@ -268,6 +265,7 @@ def group_box(x, y, w, h, title, lines, stroke='#d8c48a'):
 top_boxes = [
  ('◆ 开发工具', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
  ('◆ 调测工具', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
+ ('◆ 运维链', ['hds · cloud_proxy · ota · data_exporter', 'drp · abox']),
 ]
 dep_groups = [
  ('多媒体与图像', ['OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg', 'MPP 1.5.0 · RGA 2.2.0']),
