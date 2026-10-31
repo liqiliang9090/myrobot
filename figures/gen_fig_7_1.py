@@ -51,8 +51,8 @@ S = []   # 图体元素（svg 开闭标签在末尾按实际画布高拼装）
 
 # ---------- 版面常量 ----------
 LBL_X, LBL_W = 6, 84
-C1_X, C1_W = 116, 378                 # rk·交互业务
-C2_X, C2_W = 506, 282                 # rk·运控
+C1_X, C1_W = 110, 378                 # rk·交互业务（整体左移 6，与大脑板留隙）
+C2_X, C2_W = 500, 282                 # rk·运控
 C3_X, C3_W = 810, 320                 # orin（右移 14：与运控板框留 6px 间隙）
 TC_X, TC_W = 1146, 394                # 工具链（纵贯）
 PAD = 8
@@ -213,7 +213,7 @@ for ri, (lname, cont) in enumerate(ROWS):
     if ri == 1:
         # OS 层：rk 两列同属一个 Ubuntu 22.04.5 实例 → 外包统一框（落在运控板框内）
         WH = 24
-        S.append(box(124, yt, 656, h, 'none', '#5b87b5', 1.8, rx=6))
+        S.append(box(118, yt, 656, h, 'none', '#5b87b5', 1.8, rx=6))
         t, _ = text_block(0, yt + 16, [('Ubuntu 22.04.5', True)], fs=12,
                           color='#1c3d5f', center=452, maxw=660)
         S.append(t)
@@ -245,7 +245,7 @@ t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=13, color='
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 WHW = 24
-S.append(box(124, HW_Y, 656, HW_H, 'none', '#5b87b5', 1.8, rx=6))
+S.append(box(118, HW_Y, 656, HW_H, 'none', '#5b87b5', 1.8, rx=6))
 t, _ = text_block(0, HW_Y + 16, [('rk3576 SoC · 8 核 = 4 大核（A72）+ 4 小核（A53）', True)],
                   fs=12, color='#1c3d5f', center=452, maxw=660)
 S.append(t)
