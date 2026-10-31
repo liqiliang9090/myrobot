@@ -57,13 +57,13 @@ C3_X, C3_W = 810, 320                 # orin（右移 14：与运控板框留 6p
 TC_X, TC_W = 1146, 394                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0 = 76                                        # 板框顶（含框内标题条带，标题被框包住）
-ROW_H = [336, 78, 102, 126]           # 业务(含部分名标题行)/框架/OS(含外包框标题带)/驱动(含传感直连内容)（部分框内四层）
+ROW_H = [330, 78, 102, 126]           # 业务/框架/OS(含外包框标题带)/驱动(含传感直连内容)（部分框内四层）
 HW_H = 112                            # 硬件层（板框内、部分框外；rk 侧含外包框标题带）
 EXT_Y, EXT_H = 4, 40                 # 启元云端大模型带（贴顶，与板框留距）
 
 PART_Y = BOARD_Y0 + 26                                # 板标题条带（78..102）下方为部分框顶
 row_y = []
-_y = PART_Y                                           # 96
+_y = PART_Y + 30                                      # 部分名条带（102..128）下为业务带
 for h in ROW_H:
     row_y.append(_y); _y += h + 4
 PART_BOT = row_y[-1] + ROW_H[-1] + 12                 # 底部留 12px，部分框完整包住子框
@@ -172,7 +172,10 @@ PARTS = [(C1_X, C1_W, '交互业务（非实时）', '#f2f7fc', '#8aa8c4'),
          (C2_X, C2_W, '运控（实时 | 隔离核）', '#fdf1ea', '#c49a82'),
          (C3_X, C3_W, '复杂感知与规划', '#f6f0fb', '#a48ec4')]
 for px, pw, pname, pfill, pstroke in PARTS:
-    S.append(box(px, PART_Y, pw, PART_BOT - PART_Y, pfill, pstroke, 1.4, rx=8))   # 部分名移入业务带首行
+    S.append(box(px, PART_Y, pw, PART_BOT - PART_Y, pfill, pstroke, 2.2, rx=8))   # 部分框边框加粗
+    t, _ = text_block(0, PART_Y + 20, [(pname, True)], fs=12.5, color='#33414e',
+                      center=px + pw // 2, maxw=pw - 12)   # 部分名在部分框顶部条带
+    S.append(t)
 
 # 具身业务层：每模块独立成框（上=对外接口/依赖方，下=被依赖底座/数据源）
 # 可读性口径：文档正文里整图缩至 ~0.65×（PNG 0.43×），故模块框用衬底+深色粗边+大字号
@@ -188,18 +191,14 @@ def draw_module(px, pw, y, title, lines):
     return y + h + 5
 
 yt = row_y[0]
-CH0_H = (PART_Y - BOARD_Y0) + ROW_H[0]               # 业务行标签上延至板框顶（与板框顶对齐）
+CH0_H = (yt + ROW_H[0]) - BOARD_Y0                    # 业务行标签上延至板框顶（与板框顶对齐）
 S.append(box(LBL_X, BOARD_Y0, LBL_W, CH0_H, LBL_FILLS[0], '#9aa8b5', 1))
 t, _ = text_block(0, BOARD_Y0 + CH0_H // 2 + 4, [('具身业务层', True)], fs=13, color='#33414e',
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
-for ci, (px, pw, pname, pfill, pstroke) in enumerate(PARTS):
-    S.append(box(px + CELL_PAD, yt + 4, pw - 2 * CELL_PAD, ROW_H[0] - 8, '#f7fafe', '#a8b4c0', 1))
-    t, _ = text_block(0, yt + 21, [(pname, True)], fs=12, color='#33414e',
-                      center=px + CELL_PAD + (pw - 2 * CELL_PAD) // 2,
-                      maxw=pw - 2 * CELL_PAD - 12)    # 部分名作为业务带首行（原标题带取消）
-    S.append(t)
-    y = yt + 30
+for ci, (px, pw, *_ ) in enumerate(PARTS):
+    S.append(box(px + CELL_PAD, yt, pw - 2 * CELL_PAD, ROW_H[0], '#f7fafe', '#a8b4c0', 1))
+    y = yt + 8
     for title, lines in BIZ_COLS[ci]:
         y = draw_module(px + CELL_PAD, pw - 2 * CELL_PAD, y, title, lines)
     assert y <= yt + ROW_H[0] + 4, f'业务层模块纵向溢出(列{ci})'
