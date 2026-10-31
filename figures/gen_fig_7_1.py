@@ -56,12 +56,12 @@ C2_X, C2_W = 506, 282                 # rk·运控
 C3_X, C3_W = 810, 320                 # orin（右移 14：与运控板框留 6px 间隙）
 TC_X, TC_W = 1146, 394                # 工具链（纵贯）
 PAD = 8
-BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
+BOARD_Y0 = 76                                        # 板框顶（含框内标题条带，标题被框包住）
 ROW_H = [336, 78, 102, 126]           # 业务(含部分名标题行)/框架/OS(含外包框标题带)/驱动(含传感直连内容)（部分框内四层）
 HW_H = 112                            # 硬件层（板框内、部分框外；rk 侧含外包框标题带）
-EXT_Y, EXT_H = 20, 46
+EXT_Y, EXT_H = 12, 40                # 启元云端大模型带（上移，与板框留距）
 
-PART_Y = BOARD_Y0                                     # 部分框顶与板框顶重合（板标题移框外，业务层顶=板框顶）
+PART_Y = BOARD_Y0 + 26                                # 板标题条带（78..102）下方为部分框顶
 row_y = []
 _y = PART_Y                                           # 96
 for h in ROW_H:
@@ -104,14 +104,14 @@ os_c1 = [('systemd（em+robot.slice）· interaction.slice', False),
 os_c2 = [('无 PREEMPT_RT · isolcpus=2,3 隔离', False),
          ('mc：33×CFS+3×SCHED_RR(85/80)@CPU3', False),
          ('dm：SCHED_RR@CPU2（§2.4）', False)]
-os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）', False),
-         ('systemd · NV 多媒体栈', False),
+os_c3 = [('Ubuntu 22.04.5 · L4T R36.4.4', False),
+         ('（JetPack 6.2）· systemd · NV 多媒体栈', False),
          ('（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l', False)]
 # 驱动层：传感直连内容在前（以传感为重），底层驱动在后
-dr_c1 = [('hal_sensor：★bms/touch · SetServo · 灯语', False),
-         ('hal_camera：头部相机(ox05bis)+IMU 直连', False),
+dr_c1 = [('hal_camera：头部相机(ox05bis)+IMU 直连', False),
          ('exposure：5×ToF 曝光/板间同步（控制面）', False),
          ('配件：rc · 圈圈 · insta360 · resource_manager', False),
+         ('hal_sensor：★bms/touch · SetServo · 灯语', False),
          ('驱动：Mali kbase · RKNPU v0.9.8 · rkcif', False),
          ('+max96724 · CAN/stmmac · I2C/SPI/UART · MPP/RGA', False)]
 dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84@CPU2）', False)]
@@ -147,17 +147,17 @@ t, _ = text_block(LBL_X + 14, EXT_Y + 29,
 S.append(t)
 # 云端连接（实测 2026-10-31）：仅运控板有云链路；大脑板无直连
 S.append(arrow(450, EXT_Y + EXT_H + 1, 450, BOARD_Y0 - 2, both=True, sw=1.2))
-t, _ = text_block(462, 76, [('HTTPS/TLS 443 · aiem-gw.agibot.com /v1/session：LLM 对话/意图（Agent）；MQTT/TLS：状态/OTA（cloud_proxy）', False)],
+t, _ = text_block(462, 66, [('HTTPS/TLS 443 · aiem-gw.agibot.com /v1/session：LLM 对话/意图（Agent）；MQTT/TLS：状态/OTA', False)],
                   fs=10, color='#1c3d5f')
 S.append(t)
-t, _ = text_block(960, 76, [('（大脑板无云端直连，云流量均经运控板）', False)], fs=10, color='#6b7a89')
+t, _ = text_block(960, 66, [('（大脑板无云端直连，云流量均经运控板）', False)], fs=10, color='#6b7a89')
 S.append(t)
 
 # ---------- 板框（含部分框四层 + 硬件层） ----------
 def draw_board(bx, bw, title, stroke):
     S.append(box(bx, BOARD_Y0, bw, BOARD_BOT - BOARD_Y0, '#ffffff', stroke, 2, rx=10))
-    t, _ = text_block(bx + 6, BOARD_Y0 - 6, [(title, True)], fs=13, color='#1c3d5f',
-                      maxw=bw - 12)                   # 板标题移框外左上，让业务层顶与板框顶对齐
+    t, _ = text_block(bx + 6, BOARD_Y0 + 19, [(title, True)], fs=13, color='#1c3d5f',
+                      maxw=bw - 12)                   # 板标题在框内顶部条带（框包住标题）
     S.append(t)
 
 draw_board(C1_X - PAD, (C2_X + C2_W + PAD) - (C1_X - PAD),
@@ -185,8 +185,9 @@ def draw_module(px, pw, y, title, lines):
     return y + h + 5
 
 yt = row_y[0]
-S.append(box(LBL_X, yt, LBL_W, ROW_H[0], LBL_FILLS[0], '#9aa8b5', 1))
-t, _ = text_block(0, yt + ROW_H[0] // 2 + 4, [('具身业务层', True)], fs=13, color='#33414e',
+CH0_H = (PART_Y - BOARD_Y0) + ROW_H[0]               # 业务行标签上延至板框顶（与板框顶对齐）
+S.append(box(LBL_X, BOARD_Y0, LBL_W, CH0_H, LBL_FILLS[0], '#9aa8b5', 1))
+t, _ = text_block(0, BOARD_Y0 + CH0_H // 2 + 4, [('具身业务层', True)], fs=13, color='#33414e',
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 for ci, (px, pw, pname, pfill, pstroke) in enumerate(PARTS):
