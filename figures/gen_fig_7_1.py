@@ -66,7 +66,8 @@ row_y = []
 _y = PART_Y + PART_TITLE_H                            # 150
 for h in ROW_H:
     row_y.append(_y); _y += h + 4
-PART_BOT = row_y[-1] + ROW_H[-1]                      # 666
+PART_BOT = row_y[-1] + ROW_H[-1] + 8                  # 底部留 8px，部分框完整包住子框
+CELL_PAD = 6                                          # 部分框内子框横向内缩
 HW_Y = PART_BOT + 14                                  # 680
 HW_BOT = HW_Y + HW_H                                  # 768
 BOARD_BOT = HW_BOT + PAD                              # 776
@@ -81,9 +82,9 @@ BIZ_COLS = [
   ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
   ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'hal_camera：头部相机(ox05bis)+IMU 直连', 'exposure：5×ToF 曝光/板间同步（控制面）', '配件：rc · 圈圈 · insta360 · resource_manager']),
  ],
- [  # rk·运控：mc 对上暴露 ★接口，device_manager 为更底层设备 IO
-  ('mc 运动控制', ['★SetMcAction · velocity（指令下发）', '★mc/common/state（全量状态上报）', 'RL 策略@CPU3 · WBC · 动作 FSM']),
-  ('device_manager 设备实时 IO', ['与 mc 同 realtime.slice（§2.4）', '9×SCHED_RR 钉隔离核']),
+ [  # rk·运控：mc 对上暴露 ★接口；CPU2/CPU3 隔离核业务显式标注
+  ('mc 运动控制', ['★SetMcAction · velocity（指令下发）', '★mc/common/state（全量状态上报）', 'CPU3 独占：RL 策略 · WBC · 动作 FSM', 'CPU2：CAN 硬中断 + dm 设备 IO']),
+  ('device_manager 设备实时 IO', ['SCHED_RR 钉 CPU2 · realtime.slice', '（与 mc 同 slice，§2.4）']),
  ],
  [  # orin：任务产出层在上，感知融合居中，传感数据源在下
   ('导航与跟随', ['Nav2 1.1.20（★navi 指令/地图加载）', 'follow_node（★follow/state）', 'trajectory_tracker（环绕运镜）']),
@@ -99,12 +100,12 @@ fw_c1 = [
 ]
 fw_c2 = [('iceoryx 零拷贝实时通道', False), ('onnxruntime 实时推理', False)]
 fw_c3 = [('ROS2+Nav2 框架', False), ('TensorRT 10.7 + CUDA 12.6 + cuDNN 9.3', False), ('OpenCV · AimRT · em/process_manager1', False)]
-os_c1 = [('Ubuntu 22.04.5（6.1.141）· systemd（em+robot.slice）', False),
-         ('PipeWire · NM/hostapd/dnsmasq · mosquitto', False),
-         ('ptp4l + chrony 时钟同步', False)]
-os_c2 = [('与左列同板共享内核（无 PREEMPT_RT）', False),
-         ('实时性 = isolcpus=2,3', False),
-         ('+ SCHED_RR 80/85（§2.4）', False)]
+os_c1 = [('systemd（em+robot.slice）· interaction.slice', False),
+         ('system.slice：PipeWire/NM/mosquitto 等系统服务', False),
+         ('auxiliary 40% 限流 · 全部 SCHED_OTHER（CFS）', False)]
+os_c2 = [('无 PREEMPT_RT · isolcpus=2,3 隔离', False),
+         ('mc：33×CFS+3×SCHED_RR(85/80)@CPU3', False),
+         ('dm：SCHED_RR@CPU2（§2.4）', False)]
 os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）', False),
          ('systemd · NV 多媒体栈', False),
          ('（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l', False)]
@@ -184,10 +185,10 @@ t, _ = text_block(0, yt + ROW_H[0] // 2 + 4, [('具身业务层', True)], fs=13,
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 for ci, (px, pw, *_ ) in enumerate(PARTS):
-    S.append(box(px, yt, pw, ROW_H[0], '#f7fafe', '#a8b4c0', 1))
+    S.append(box(px + CELL_PAD, yt, pw - 2 * CELL_PAD, ROW_H[0], '#f7fafe', '#a8b4c0', 1))
     y = yt + 8
     for title, lines in BIZ_COLS[ci]:
-        y = draw_module(px, pw, y, title, lines)
+        y = draw_module(px + CELL_PAD, pw - 2 * CELL_PAD, y, title, lines)
     assert y <= yt + ROW_H[0] + 4, f'业务层模块纵向溢出(列{ci})'
 
 # 其余三层单元格（三列共享行坐标；row_y[0] 为业务行，框架/OS/驱动自 row_y[1] 起）
@@ -201,26 +202,28 @@ for ri, (lname, cont) in enumerate(ROWS):
         # OS 层：rk 两列同属一个 Ubuntu 22.04.5 实例 → 外包统一框（落在运控板框内）
         WH = 24
         S.append(box(112, yt, 680, h, 'none', '#5b87b5', 1.8, rx=6))
-        t, _ = text_block(0, yt + 16, [('同一 Ubuntu 22.04.5 系统实例', True)], fs=12,
+        t, _ = text_block(0, yt + 16, [('Ubuntu 22.04.5', True)], fs=12,
                           color='#1c3d5f', center=452, maxw=660)
         S.append(t)
         for ci in (0, 1):
             px, pw, *_ = PARTS[ci]
             ih = h - WH - 4
-            S.append(box(px, yt + WH, pw, ih, FILLS[ri], '#a8b4c0', 1))
-            t, endy = text_block(px + 10, yt + WH + 17, cont[ci], fs=12.2, maxw=pw - 18)
+            S.append(box(px + CELL_PAD, yt + WH, pw - 2 * CELL_PAD, ih, FILLS[ri], '#a8b4c0', 1))
+            t, endy = text_block(px + CELL_PAD + 10, yt + WH + 17, cont[ci],
+                                 fs=12.2, maxw=pw - 2 * CELL_PAD - 18)
             S.append(t)
             assert endy <= yt + WH + ih + 6, f'{lname} 纵向溢出'
         px, pw, *_ = PARTS[2]
-        S.append(box(px, yt, pw, h, FILLS[ri], '#a8b4c0', 1))
-        t, endy = text_block(px + 10, yt + (h - 17 * len(cont[2])) // 2 + 14,
-                             cont[2], fs=12.2, maxw=pw - 18)
+        S.append(box(px + CELL_PAD, yt, pw - 2 * CELL_PAD, h, FILLS[ri], '#a8b4c0', 1))
+        t, endy = text_block(px + CELL_PAD + 10, yt + (h - 17 * len(cont[2])) // 2 + 14,
+                             cont[2], fs=12.2, maxw=pw - 2 * CELL_PAD - 18)
         S.append(t)
         assert endy <= yt + h + 6, f'{lname} 纵向溢出'
         continue
     for ci, (px, pw, *_ ) in enumerate(PARTS):
-        S.append(box(px, yt, pw, h, FILLS[ri], '#a8b4c0', 1))
-        t, endy = text_block(px + 10, yt + 19, cont[ci], fs=12.2, maxw=pw - 18)
+        S.append(box(px + CELL_PAD, yt, pw - 2 * CELL_PAD, h, FILLS[ri], '#a8b4c0', 1))
+        t, endy = text_block(px + CELL_PAD + 10, yt + 19, cont[ci],
+                             fs=12.2, maxw=pw - 2 * CELL_PAD - 18)
         S.append(t)
         assert endy <= yt + h + 6, f'{lname} 纵向溢出'
 
@@ -236,14 +239,15 @@ t, _ = text_block(0, HW_Y + 16, [('rk3576 SoC · 8 核 = 4 大核（A72）+ 4 �
 S.append(t)
 for px, pw, cont in ((C1_X, C1_W, hw_c1), (C2_X, C2_W, hw_c2)):
     ih = HW_H - WHW - 4
-    S.append(box(px, HW_Y + WHW, pw, ih, HW_FILL, '#a8b4c0', 1))
-    t, endy = text_block(px + 10, HW_Y + WHW + 17, cont, fs=12.2, maxw=pw - 18)
+    S.append(box(px + CELL_PAD, HW_Y + WHW, pw - 2 * CELL_PAD, ih, HW_FILL, '#a8b4c0', 1))
+    t, endy = text_block(px + CELL_PAD + 10, HW_Y + WHW + 17, cont,
+                         fs=12.2, maxw=pw - 2 * CELL_PAD - 18)
     S.append(t)
     assert endy <= HW_Y + WHW + ih + 6, '硬件层纵向溢出'
 px, pw = C3_X, C3_W
-S.append(box(px, HW_Y, pw, HW_H, HW_FILL, '#a8b4c0', 1))
-t, endy = text_block(px + 10, HW_Y + (HW_H - 17 * len(hw_c3)) // 2 + 14,
-                     hw_c3, fs=12.2, maxw=pw - 18)
+S.append(box(px + CELL_PAD, HW_Y, pw - 2 * CELL_PAD, HW_H, HW_FILL, '#a8b4c0', 1))
+t, endy = text_block(px + CELL_PAD + 10, HW_Y + (HW_H - 17 * len(hw_c3)) // 2 + 14,
+                     hw_c3, fs=12.2, maxw=pw - 2 * CELL_PAD - 18)
 S.append(t)
 assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
 
