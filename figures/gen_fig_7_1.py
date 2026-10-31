@@ -39,10 +39,10 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
             f'{m}marker-end="url(#ah)"{d}/>')
 
 S = []
-S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="846" viewBox="0 0 1560 846">')
+S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="872" viewBox="0 0 1560 872">')
 S.append('<defs><marker id="ah" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">'
          '<path d="M0,0 L9,4 L0,8 z" fill="#35495e"/></marker></defs>')
-S.append(f'<rect x="0" y="0" width="1560" height="846" fill="#ffffff"/>')
+S.append(f'<rect x="0" y="0" width="1560" height="872" fill="#ffffff"/>')
 
 # ---------- 版面常量 ----------
 LBL_X, LBL_W = 20, 92                 # 层标签列
@@ -55,7 +55,7 @@ HDR_Y, HDR_H = 84, 34                 # 板头行
 SUB_Y, SUB_H = 122, 28                # 部分行
 STRIP_A_Y, STRIP_B_Y, STRIP_C_Y = 160, 180, 200  # 连接条带三行
 LAYER_Y0 = 214                        # 业务层顶
-LAYERS = [('具身业务层', 272, '#eaf3ff'), ('具身框架层', 74, '#f0f7ea'),
+LAYERS = [('具身业务层', 290, '#eaf3ff'), ('具身框架层', 74, '#f0f7ea'),
           ('OS 层', 74, '#fdf6e3'), ('驱动层', 66, '#f5eff7'), ('硬件层', 88, '#fdeee6')]
 # 层 y 累积
 ys = []
@@ -105,7 +105,7 @@ S.append(t)
 c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
 t, _ = text_block(c1c - 185, STRIP_A_Y - 5, [('① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑', False)], fs=10.8, color='#35495e')
 S.append(t); S.append(arrow(c1c - 120, STRIP_A_Y + 3, c2c, STRIP_A_Y + 3))
-t, _ = text_block(c1c - 185, STRIP_B_Y - 5, [('② 跨板·任务与感知（FastDDS 域0）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑', False)], fs=10.8, color='#35495e')
+t, _ = text_block(c1c - 185, STRIP_B_Y - 5, [('② 跨板·任务与感知（FastDDS 域0 · 10.1.1.0/24）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑', False)], fs=10.8, color='#35495e')
 S.append(t); S.append(arrow(c1c, STRIP_B_Y + 3, c3c, STRIP_B_Y + 3))
 t, _ = text_block(c2c + 40, STRIP_C_Y - 5, [('③ 跨板·速度直连：orin velocity(pnc/follow/运镜)→MC（SetMcInputSource 仲裁）', False)], fs=10.8, color='#35495e')
 S.append(t); S.append(arrow(c3c, STRIP_C_Y + 3, c2c, STRIP_C_Y + 3, both=False))
@@ -124,6 +124,7 @@ biz_c1 = [
  ('系统与运维', True),
  ('housekeeper+app_proxy · hds · cloud_proxy · ota', False),
  ('data_exporter · drp 录包 · abox 日志', False),
+ ('板基座：sys_guard · iox-roudi · tetherd · secret_store', False),
  ('传感与外设', True),
  ('hal_sensor（★bms/touch · SetServo · LedStripCommand）', False),
  ('legged_odom（/odom·/tf）· hal_camera/hal_rgbd rk 实例', False),
@@ -153,6 +154,7 @@ biz_c3 = [
  ('传感接入', True),
  ('hal_rgbd 5目ToF · hal_camera 相机阵列+IMU', False),
  ('hal_sensor_soc1（ADU/温度）', False),
+ ('板基座：sys_guard · ota_slave · data_exporter', False),
  ('（部署未运行的清单见 §6.4.2）', False),
 ]
 fw_c1 = [

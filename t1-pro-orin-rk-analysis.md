@@ -1352,7 +1352,7 @@ flowchart LR
 ![图 7-1 分层系统架构图（双板纵切 × 五层横切 × 工具链纵贯）](figures/fig-7-1-layered-arch.svg)
 
 > **图 7-1 读法**：行=五层（业务→框架→OS→驱动→硬件，上层依赖下层）、列=纵切三部分（rk 交互业务 / rk 运控执行 / orin 感知规划）、最右列=工具链纵贯（全高）。
-> **连线与交互**（图上带编号的箭头）：**① 板内**（rk 业务⇄运控，iceoryx/DDS）——task_engine→★SetMcAction/velocity ↓，mc→★mc/common/state ↑；**② 跨板·任务与感知**（rk 业务⇄orin，FastDDS 域 0）——FollowTaskCtrl/★navi 指令 ↓，★follow_candidates/点云/代价图、/odom·/tf ↑（只走结果级数据，相机原图板内消化）；**③ 跨板·速度直连**（orin→MC）——nav2/follow/运镜发布 velocity(pnc/follow)，MC 按 SetMcInputSource 仲裁；**外部接入**——App→app_proxy(TRRO/鉴权)、云→cloud_proxy(MQTT/TLS)、遥控器→rc(蓝牙)、圈圈→connx(BLE+UWB)、Insta360→insta360(WiFi)，全部终结于 rk；PC ★接口面 FastDDS 直连双板；**虚线**=工具链注入。模块级全量接口见 §7.4，连接视角见 §7.2。
+> **连线与交互**（图上带编号的箭头）：**① 板内**（rk 业务⇄运控，iceoryx/DDS）——task_engine→★SetMcAction/velocity ↓，mc→★mc/common/state ↑；**② 跨板·任务与感知**（rk 业务⇄orin，内部以太网 10.1.1.0/24 · FastDDS 域 0）——FollowTaskCtrl/★navi 指令 ↓，★follow_candidates/点云/代价图、/odom·/tf ↑（只走结果级数据，相机原图板内消化）；**③ 跨板·速度直连**（orin→MC）——nav2/follow/运镜发布 velocity(pnc/follow)，MC 按 SetMcInputSource 仲裁；**外部接入**——App→app_proxy(TRRO/鉴权)、云→cloud_proxy(MQTT/TLS)、遥控器→rc(蓝牙)、圈圈→connx(BLE+UWB)、Insta360→insta360(WiFi)，全部终结于 rk；PC ★接口面 FastDDS 直连双板；**虚线**=工具链注入。模块级全量接口见 §7.4，连接视角见 §7.2。
 
 读图要点（含对本图排版方案的事实核对，依据 §1–§6 实测）：
 
