@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-# 生成 §7.1 分层系统架构图（双板纵切 × 五层横切 × 工具链纵贯）SVG
-# 用法：python3 figures/gen_fig_7_1.py  →  figures/fig-7-1-layered-arch.svg
-OVERFLOW = []
+# 生成 §7.1 逻辑视图（双板纵切 × 五层横切 × 工具链纵贯）SVG/PNG
+# 结构：板框 ⊃ 部分框（业务/框架/OS/驱动 四层）+ 硬件层格；①②③通信线画在图底部
+# 用法：python3 figures/gen_fig_7_1.py  →  figures/fig-7-1-layered-arch.svg / .png
 FONT = "Noto Sans CJK SC"
 
 def esc(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 def est_w(s, fs):
-    """估算行宽（CJK≈1.0em，ASCII≈0.55em），用于自检是否溢出单元格"""
     w = 0.0
     for ch in s:
-        w += 1.0 if ord(ch) > 0x2E80 else (0.62 if ch.isascii() and not ch.isalnum() else 0.56)
+        w += 1.0 if ord(ch) > 0x2E80 else (0.62 if not ch.isalnum() else 0.56)
     return w * fs
 
-def text_block(x, y, lines, fs=12, lh=None, color='#1f2933', maxw=None, tag=''):
-    """lines: [(text, bold)]；返回 svg 与结束 y"""
+def text_block(x, y, lines, fs=12, lh=None, color='#1f2933', maxw=None, center=None):
     lh = lh or int(fs * 1.42)
     out = []
     for t, b in lines:
         if maxw:
             w = est_w(t, fs)
-            if w > maxw:
-                OVERFLOW.append((round(w), maxw, t))
-        out.append(f'<text x="{x}" y="{y}" font-family="{FONT}" font-size="{fs}" '
+            assert w <= maxw, f'溢出({w:.0f}>{maxw}): {t}'
+        tx = x if center is None else center - est_w(t, fs) / 2
+        out.append(f'<text x="{tx:.0f}" y="{y}" font-family="{FONT}" font-size="{fs}" '
                    f'fill="{color}"{" font-weight=\"700\"" if b else ""}>{esc(t)}</text>')
         y += lh
     return '\n'.join(out), y
@@ -40,82 +38,36 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
 
 S = []
 S.append('<?xml version="1.0" encoding="UTF-8"?>')
-S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="872" viewBox="0 0 1560 872">')
+S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="930" viewBox="0 0 1560 930">')
 S.append('<defs><marker id="ah" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">'
          '<path d="M0,0 L9,4 L0,8 z" fill="#35495e"/></marker></defs>')
-S.append(f'<rect x="0" y="0" width="1560" height="872" fill="#ffffff"/>')
+S.append('<rect x="0" y="0" width="1560" height="930" fill="#ffffff"/>')
 
 # ---------- 版面常量 ----------
-LBL_X, LBL_W = 20, 92                 # 层标签列
+LBL_X, LBL_W = 20, 92
 C1_X, C1_W = 116, 378                 # rk·交互业务
-C2_X, C2_W = 506, 282                 # rk·运控执行
+C2_X, C2_W = 506, 282                 # rk·运控
 C3_X, C3_W = 796, 320                 # orin
 TC_X, TC_W = 1140, 400                # 工具链（纵贯）
-EXT_Y, EXT_H = 20, 46                 # 外部生态带
-HDR_Y, HDR_H = 84, 34                 # 板头行
-SUB_Y, SUB_H = 122, 28                # 部分行
-STRIP_A_Y, STRIP_B_Y, STRIP_C_Y = 160, 180, 200  # 连接条带三行
-LAYER_Y0 = 214                        # 业务层顶
-LAYERS = [('具身业务层', 290, '#eaf3ff'), ('具身框架层', 74, '#f0f7ea'),
-          ('OS 层', 74, '#fdf6e3'), ('驱动层', 66, '#f5eff7'), ('硬件层', 88, '#fdeee6')]
-# 层 y 累积
-ys = []
-y = LAYER_Y0
-for _, h, _ in LAYERS:
-    ys.append(y); y += h + 4
-MAT_BOT = y - 4                       # 矩阵底
-TC_BOT = MAT_BOT
+PAD = 8
+BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
+ROW_H = [290, 74, 74, 66]             # 业务/框架/OS/驱动（部分框内四层）
+HW_H = 88                             # 硬件层（板框内、部分框外）
+EXT_Y, EXT_H = 20, 46
 
-# ---------- 外部生态带（跨矩阵三列宽） ----------
-S.append(box(LBL_X, EXT_Y, (C3_X + C3_W) - LBL_X, EXT_H, '#e8f1fb', '#7fa8cc', 1.2))
-t, _ = text_block(LBL_X + 14, EXT_Y + 29,
-                  [('外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板', True)],
-                  fs=13, color='#1c3d5f', maxw=(C3_X + C3_W) - LBL_X - 28, tag='ext')
-S.append(t)
-for ax in (900, 1000, 1060):                      # 外部→rk 三个小箭头（右移避让接入行文字）
-    S.append(arrow(ax, EXT_Y + EXT_H + 1, ax, HDR_Y - 2, both=False, sw=1.2))
-t, _ = text_block(LBL_X, 78, [('[接入] App→app_proxy(TRRO/鉴权) · 云→cloud_proxy(MQTT/TLS) · 遥控器→rc(蓝牙) · 圈圈→connx(BLE+UWB) · Insta360→insta360(WiFi) · PC→★接口面(FastDDS 直连双板)', False)],
-                  fs=10.5, color='#4a5b6c')
-S.append(t)
+PART_Y = BOARD_Y0 + BOARD_TITLE_H                     # 126
+row_y = []
+_y = PART_Y + PART_TITLE_H                            # 150
+for h in ROW_H:
+    row_y.append(_y); _y += h + 4
+PART_BOT = row_y[-1] + ROW_H[-1]                      # 666
+HW_Y = PART_BOT + 14                                  # 680
+HW_BOT = HW_Y + HW_H                                  # 768
+BOARD_BOT = HW_BOT + PAD                              # 776
 
-# ---------- 板头行 ----------
-S.append(box(C1_X, HDR_Y, (C2_X + C2_W) - C1_X, HDR_H, '#dce9f7', '#5b87b5', 1.2))
-t, _ = text_block(C1_X + 12, HDR_Y + 22, [('运控板 rk3576（soc0 · 10.1.1.100 · 8 核 · CPU2/3 隔离）', True)],
-                  fs=13, maxw=(C2_X + C2_W) - C1_X - 24)
-S.append(t)
-S.append(box(C3_X, HDR_Y, C3_W, HDR_H, '#eadff5', '#8d6fb4', 1.2))
-t, _ = text_block(C3_X + 10, HDR_Y + 22, [('大脑板 Orin Nano Super（soc1）', True)], fs=13, maxw=C3_W - 20)
-S.append(t)
-# 工具链条头
-S.append(box(TC_X, HDR_Y, TC_W, HDR_H, '#fdf3d0', '#c9a24b', 1.2))
-t, _ = text_block(TC_X + 12, HDR_Y + 22, [('◆ 三方工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13, maxw=TC_W - 24)
-S.append(t)
-
-# ---------- 部分行 ----------
-S.append(box(C1_X, SUB_Y, C1_W, SUB_H, '#f2f7fc', '#8aa8c4'))
-t, _ = text_block(C1_X + 10, SUB_Y + 19, [('交互业务（非实时）interaction/system/auxiliary.slice', True)], fs=11.5, maxw=C1_W - 20)
-S.append(t)
-S.append(box(C2_X, SUB_Y, C2_W, SUB_H, '#fdf1ea', '#c49a82'))
-t, _ = text_block(C2_X + 10, SUB_Y + 19, [('运控执行（实时）realtime.slice · 隔离核', True)], fs=11.5, maxw=C2_W - 20)
-S.append(t)
-S.append(box(C3_X, SUB_Y, C3_W, SUB_H, '#f6f0fb', '#a48ec4'))
-t, _ = text_block(C3_X + 10, SUB_Y + 19, [('复杂感知与规划', True)], fs=11.5, maxw=C3_W - 20)
-S.append(t)
-
-# ---------- 连接条带（板内 / 跨板 / 工具链注入） ----------
-c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
-t, _ = text_block(c1c - 185, STRIP_A_Y - 5, [('① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑', False)], fs=10.8, color='#35495e')
-S.append(t); S.append(arrow(c1c - 120, STRIP_A_Y + 3, c2c, STRIP_A_Y + 3))
-t, _ = text_block(c1c - 185, STRIP_B_Y - 5, [('② 跨板·任务与感知（FastDDS 域0 · 10.1.1.0/24）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑', False)], fs=10.8, color='#35495e')
-S.append(t); S.append(arrow(c1c, STRIP_B_Y + 3, c3c, STRIP_B_Y + 3))
-t, _ = text_block(c2c + 40, STRIP_C_Y - 5, [('③ 跨板·速度直连：orin velocity(pnc/follow/运镜)→MC（SetMcInputSource 仲裁）', False)], fs=10.8, color='#35495e')
-S.append(t); S.append(arrow(c3c, STRIP_C_Y + 3, c2c, STRIP_C_Y + 3, both=False))
-S.append(arrow(TC_X, STRIP_B_Y + 3, C3_X + C3_W, STRIP_B_Y + 3, dash='5,4', sw=1.3))
-
-# ---------- 五层 ----------
-# 业务层内容（三列）
+# ---------- 内容 ----------
 biz_c1 = [
- ('业务大脑', True),
+ ('Agent 智能体', True),
  ('Agent 对话智能体（★asr_result/PlayTts）', False),
  ('task_engine 任务引擎（AmRequest 仲裁）', False),
  ('SM 状态机（sm/system_state）', False),
@@ -166,52 +118,99 @@ fw_c1 = [
 fw_c2 = [('iceoryx 零拷贝实时通道', False), ('onnxruntime 实时推理', False)]
 fw_c3 = [('ROS2+Nav2 框架 · TensorRT 10.7+CUDA12.6+cuDNN', False), ('OpenCV · AimRT · em/process_manager1', False)]
 os_c1 = [('Ubuntu 22.04.5（6.1.141）· systemd（em+robot.slice）', False),
-          ('PipeWire · NM/hostapd/dnsmasq · mosquitto', False),
-          ('ptp4l + chrony 时钟同步', False)]
+         ('PipeWire · NM/hostapd/dnsmasq · mosquitto', False),
+         ('ptp4l + chrony 时钟同步', False)]
 os_c2 = [('与左列同板共享内核（无 PREEMPT_RT）', False),
-          ('实时性 = isolcpus=2,3', False),
-          ('+ SCHED_RR 80/85（§2.4）', False)]
+         ('实时性 = isolcpus=2,3', False),
+         ('+ SCHED_RR 80/85（§2.4）', False)]
 os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）· systemd', False),
-          ('NV 多媒体栈（NVDEC/NVENC/NVJPG/VIC/OFA）', False),
-          ('ptp4l 时钟同步', False)]
+         ('NV 多媒体栈（NVDEC/NVENC/NVJPG/VIC/OFA）', False),
+         ('ptp4l 时钟同步', False)]
 dr_c1 = [('Mali kbase · RKNPU v0.9.8 · CAN · stmmac+YT9215RB', False), ('V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA', False)]
 dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84 @CPU2）', False)]
 dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机', False),
-          ('（ox05bis/max96724）· NVDEC/NVENC', False),
-          ('千兆以太', False)]
+         ('（ox05bis/max96724）· NVDEC/NVENC', False),
+         ('千兆以太', False)]
 hw_c1 = [('rk3576 SoC（8核 A53+A72 big.LITTLE）', False),
-          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
-          ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45', False),
-          ('本体传感器（BMS/触摸/IMU…）', False)]
-hw_c2 = [('CAN0/CAN1 总线', False), ('14× 关节执行器 + 主控 MCU', False)]
+         ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
+         ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45', False),
+         ('本体传感器（BMS/触摸/IMU…）', False)]
+hw_c2 = [('CAN0/CAN1 总线', False),
+         ('14× 关节执行器 + 主控 MCU', False)]
 hw_c3 = [('Orin（6×A78AE · Ampere 1024CUDA+32TC）', False),
          ('统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G', False),
          ('头部相机阵列（双目/鱼眼/彩色/5目ToF）', False)]
 
-CONTENT = [  # (层序号, 三列内容, 字号)
- (0, (biz_c1, biz_c2, biz_c3), 11.6),
- (1, (fw_c1, fw_c2, fw_c3), 11.6),
- (2, (os_c1, os_c2, os_c3), 11.6),
- (3, (dr_c1, dr_c2, dr_c3), 11.6),
- (4, (hw_c1, hw_c2, hw_c3), 11.6),
-]
-FILLS = ['#f7fafe', '#f6faf2', '#fefaf0', '#faf6fb', '#fef6f1']
-for i, (name, h, _) in enumerate(LAYERS):
-    ytop = ys[i]
-    # 层标签
-    S.append(box(LBL_X, ytop, LBL_W, h, LAYERS[i][2], '#9aa8b5', 1))
-    t, _ = text_block(LBL_X + 10, ytop + h // 2 + 4, [(name, True)], fs=12, color='#33414e', maxw=LBL_W - 16)
-    S.append(t)
-    # 三列单元格
-    for cx, cw, cont, fill in ((C1_X, C1_W, CONTENT[i][1][0], FILLS[i]),
-                               (C2_X, C2_W, CONTENT[i][1][1], FILLS[i]),
-                               (C3_X, C3_W, CONTENT[i][1][2], FILLS[i])):
-        S.append(box(cx, ytop, cw, h, fill, '#a8b4c0', 1))
-        t, endy = text_block(cx + 10, ytop + 18, cont, fs=CONTENT[i][2], maxw=cw - 20)
-        S.append(t)
-        assert endy <= ytop + h + 6, f'{name} 单元格纵向溢出: {endy} > {ytop + h}'
+ROWS = [('具身业务层', (biz_c1, biz_c2, biz_c3)),
+        ('具身框架层', (fw_c1, fw_c2, fw_c3)),
+        ('OS 层', (os_c1, os_c2, os_c3)),
+        ('驱动层', (dr_c1, dr_c2, dr_c3))]
+FILLS = ['#f7fafe', '#f6faf2', '#fefaf0', '#faf6fb']
+HW_FILL = '#fef6f1'
+LBL_FILLS = ['#eaf3ff', '#f0f7ea', '#fdf6e3', '#f5eff7', '#fdeee6']
 
-# ---------- 工具链纵贯列（8 组小框） ----------
+# ---------- 外部生态带 + 接入行 ----------
+S.append(box(LBL_X, EXT_Y, (C3_X + C3_W) - LBL_X, EXT_H, '#e8f1fb', '#7fa8cc', 1.2))
+t, _ = text_block(LBL_X + 14, EXT_Y + 29,
+                  [('外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板', True)],
+                  fs=13, color='#1c3d5f', maxw=(C3_X + C3_W) - LBL_X - 28)
+S.append(t)
+for ax in (900, 1000, 1060):
+    S.append(arrow(ax, EXT_Y + EXT_H + 1, ax, BOARD_Y0 - 2, both=False, sw=1.2))
+t, _ = text_block(LBL_X, 88, [('[接入] App→app_proxy(TRRO/鉴权) · 云→cloud_proxy(MQTT/TLS) · 遥控器→rc(蓝牙) · 圈圈→connx(BLE+UWB) · Insta360→insta360(WiFi) · PC→★接口面(FastDDS 直连双板)', False)],
+                  fs=10.5, color='#4a5b6c')
+S.append(t)
+
+# ---------- 板框（含部分框四层 + 硬件层） ----------
+def draw_board(bx, bw, title, stroke):
+    S.append(box(bx, BOARD_Y0, bw, BOARD_BOT - BOARD_Y0, '#ffffff', stroke, 2, rx=10))
+    t, _ = text_block(0, BOARD_Y0 + 20, [(title, True)], fs=13, color='#1c3d5f',
+                      center=bx + bw // 2, maxw=bw - 20)
+    S.append(t)
+
+draw_board(C1_X - PAD, (C2_X + C2_W + PAD) - (C1_X - PAD),
+           '运动板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）', '#5b87b5')
+draw_board(C3_X - PAD, (C3_X + C3_W + PAD) - (C3_X - PAD),
+           '大脑板 Orin Nano（6×ARM + Orin 67TOPS）', '#8d6fb4')
+
+PARTS = [(C1_X, C1_W, '交互业务（非实时）', '#f2f7fc', '#8aa8c4'),
+         (C2_X, C2_W, '运控（实时 | 隔离核）', '#fdf1ea', '#c49a82'),
+         (C3_X, C3_W, '复杂感知与规划', '#f6f0fb', '#a48ec4')]
+for px, pw, pname, pfill, pstroke in PARTS:
+    S.append(box(px, PART_Y, pw, PART_BOT - PART_Y, pfill, pstroke, 1.4, rx=8))
+    t, _ = text_block(0, PART_Y + 17, [(pname, True)], fs=12, color='#33414e',
+                      center=px + pw // 2, maxw=pw - 12)
+    S.append(t)
+
+# 四层单元格（三列共享行坐标）
+for ri, (lname, cont) in enumerate(ROWS):
+    yt = row_y[ri]; h = ROW_H[ri]
+    S.append(box(LBL_X, yt, LBL_W, h, LBL_FILLS[ri], '#9aa8b5', 1))
+    t, _ = text_block(0, yt + h // 2 + 4, [(lname, True)], fs=12, color='#33414e',
+                      center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
+    S.append(t)
+    for ci, (px, pw, *_ ) in enumerate(PARTS):
+        S.append(box(px, yt, pw, h, FILLS[ri], '#a8b4c0', 1))
+        t, endy = text_block(px + 10, yt + 18, cont[ci], fs=11.6, maxw=pw - 20)
+        S.append(t)
+        assert endy <= yt + h + 6, f'{lname} 纵向溢出'
+
+# 硬件层（板框内、部分框外）
+S.append(box(LBL_X, HW_Y, LBL_W, HW_H, LBL_FILLS[4], '#9aa8b5', 1))
+t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=12, color='#33414e',
+                  center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
+S.append(t)
+for px, pw, cont in ((C1_X, C1_W, hw_c1), (C2_X, C2_W, hw_c2), (C3_X, C3_W, hw_c3)):
+    S.append(box(px, HW_Y, pw, HW_H, HW_FILL, '#a8b4c0', 1))
+    t, endy = text_block(px + 10, HW_Y + 18, cont, fs=11.6, maxw=pw - 20)
+    S.append(t)
+    assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
+
+# ---------- 工具链纵贯列 ----------
+S.append(box(TC_X, BOARD_Y0, TC_W, BOARD_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
+t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 三方工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
+                  color='#7a5c14', center=TC_X + TC_W // 2, maxw=TC_W - 20)
+S.append(t)
 groups = [
  ('◆ 中间件与通信', ['ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps', 'iceoryx 2.95.4.2 · AimRT + aimrt_py']),
  ('◆ AI 推理运行时', ['onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx', 'TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3']),
@@ -222,20 +221,30 @@ groups = [
  ('◆ 构建与代码生成', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
  ('◆ 调试与观测', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
 ]
-gy = HDR_Y + HDR_H + 6
-avail = TC_BOT - gy
-gh = min(66, (avail - 7 * 5) // 8)
+gy = BOARD_Y0 + 36
+gh = 64
 for title, lines in groups:
-    S.append(box(TC_X, gy, TC_W, gh, '#fffdf4', '#d8c48a', 1))
-    t, endy = text_block(TC_X + 10, gy + 17, [(title, True)] + [(l, False) for l in lines],
-                         fs=11.4, maxw=TC_W - 20)
+    S.append(box(TC_X + 8, gy, TC_W - 16, gh, '#ffffff', '#d8c48a', 1, rx=5))
+    t, endy = text_block(TC_X + 18, gy + 17, [(title, True)] + [(l, False) for l in lines],
+                         fs=11.4, maxw=TC_W - 36)
     S.append(t)
     gy += gh + 5
 
-# ---------- 底部图例 ----------
-t, _ = text_block(LBL_X, MAT_BOT + 22, [
+# ---------- ①②③通信线（图底部） ----------
+c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
+AY1, AY2, AY3 = BOARD_BOT + 30, BOARD_BOT + 54, BOARD_BOT + 78
+t, _ = text_block(c1c - 185, AY1 - 6, [('① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑', False)], fs=10.8)
+S.append(t); S.append(arrow(c1c - 120, AY1, c2c, AY1))
+t, _ = text_block(c1c - 185, AY2 - 6, [('② 跨板·任务与感知（FastDDS 域0 · 10.1.1.0/24）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑', False)], fs=10.8)
+S.append(t); S.append(arrow(c1c, AY2, c3c, AY2))
+t, _ = text_block(c2c + 40, AY3 - 6, [('③ 跨板·速度直连：orin velocity(pnc/follow/运镜)→MC（SetMcInputSource 仲裁）', False)], fs=10.8)
+S.append(t); S.append(arrow(c3c, AY3, c2c, AY3, both=False))
+S.append(arrow(TC_X, AY2, C3_X + C3_W, AY2, dash='5,4', sw=1.3))
+
+# ---------- 图例 ----------
+t, _ = text_block(LBL_X, BOARD_BOT + 110, [
     ('图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。', False),
-    ('列内链：运控执行列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。', False)],
+    ('列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。', False)],
     fs=11, color='#5b6b7a', lh=16)
 S.append(t)
 
@@ -247,7 +256,4 @@ try:
     cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=1.5)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
-if OVERFLOW:
-    for w, m, t in OVERFLOW: print(f'溢出 {w}>{m}: {t}')
-    raise SystemExit(1)
-print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 底边 {MAT_BOT}px)')
+print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 板底 {BOARD_BOT}px, 画布 930px)')
