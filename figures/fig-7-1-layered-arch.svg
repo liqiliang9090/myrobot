@@ -10,11 +10,11 @@
 <text x="281" y="95" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">运控板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）</text>
 <rect x="802" y="76" width="336" height="850" rx="10" fill="#ffffff" stroke="#8d6fb4" stroke-width="2"/>
 <text x="829" y="95" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">大脑板 Orin Nano（6×ARM + Orin 67TOPS）</text>
-<rect x="116" y="102" width="378" height="690" rx="8" fill="#f2f7fc" stroke="#8aa8c4" stroke-width="2.2"/>
+<rect x="116" y="102" width="378" height="690" rx="8" fill="#f2f7fc" stroke="#8aa8c4" stroke-width="3.2"/>
 <text x="249" y="122" font-family="Noto Sans CJK SC" font-size="12.5" fill="#33414e" font-weight="700">交互业务（非实时）</text>
-<rect x="506" y="102" width="282" height="690" rx="8" fill="#fdf1ea" stroke="#c49a82" stroke-width="2.2"/>
+<rect x="506" y="102" width="282" height="690" rx="8" fill="#fdf1ea" stroke="#c49a82" stroke-width="3.2"/>
 <text x="579" y="122" font-family="Noto Sans CJK SC" font-size="12.5" fill="#33414e" font-weight="700">运控（实时 | 隔离核）</text>
-<rect x="810" y="102" width="320" height="690" rx="8" fill="#f6f0fb" stroke="#a48ec4" stroke-width="2.2"/>
+<rect x="810" y="102" width="320" height="690" rx="8" fill="#f6f0fb" stroke="#a48ec4" stroke-width="3.2"/>
 <text x="926" y="122" font-family="Noto Sans CJK SC" font-size="12.5" fill="#33414e" font-weight="700">复杂感知与规划</text>
 <rect x="20" y="76" width="84" height="386" rx="6" fill="#eaf3ff" stroke="#9aa8b5" stroke-width="1"/>
 <text x="30" y="273" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">具身业务层</text>
