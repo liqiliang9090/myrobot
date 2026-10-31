@@ -1347,26 +1347,12 @@ flowchart LR
 
 ### 7.1 分层系统架构图（双板纵切 × 五层横切 × 工具链纵贯）
 
-**排版口径**：**纵向（列）**按部署域切分为三部分——运控板 rk 的「交互业务（非实时）」与「运控执行（实时）」两列 + 大脑板 orin 的「复杂感知与规划」一列；**横向（行）**自上而下为**具身业务层 → 具身框架层 → OS 层 → 驱动层 → 硬件层**五层（即自底向上：硬件→驱动→OS→框架→业务）；**最右侧为纵贯全部层级的「三方工具链」大框**。因 mermaid 自动布局无法锁定矩阵式行列顺序，本图采用表格画法精确实现「行=层、列=纵切、右列纵贯」。按 4+1 视图口径：**具身业务层的功能模块（职责+接口★）即逻辑视图本体**，硬件/驱动/OS 层为物理/过程视图成分（为保持一图综览而并列呈现）；模块间接口协作另见 §7.4，场景串联见 §6.2。
+**排版口径**：**纵向（列）**按部署域切分为三部分——运控板 rk 的「交互业务（非实时）」与「运控执行（实时）」两列 + 大脑板 orin 的「复杂感知与规划」一列；**横向（行）**自上而下为**具身业务层 → 具身框架层 → OS 层 → 驱动层 → 硬件层**五层（即自底向上：硬件→驱动→OS→框架→业务）；**最右侧为纵贯全部层级的「三方工具链」大框**。因 mermaid 自动布局无法锁定矩阵式行列顺序，本图由脚本生成 **SVG 矢量图**（`figures/gen_fig_7_1.py` → `figures/fig-7-1-layered-arch.svg`），行列位置精确可控，并直接画出板内/跨板数据流与工具链注入连线。按 4+1 视图口径：**具身业务层的功能模块（职责+接口★）即逻辑视图本体**，硬件/驱动/OS 层为物理/过程视图成分（为保持一图综览而并列呈现）；模块间接口协作另见 §7.4，场景串联见 §6.2。
 
-<table>
-<tr><th colspan="5">☁ 外部生态：开发 PC（★接口面）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板</th></tr>
-<tr><th></th><th colspan="2">🖥 运控板 rk3576（soc0 · 10.1.1.100 · 8 核 · CPU2/3 隔离）</th><th>🧠 大脑板 Jetson Orin Nano Super（soc1 · 10.1.1.101）</th><th rowspan="7">🧰 <b>三方工具链</b>（纵贯两板全部层级 · 版本与开源仓见 §6.1）<br/><br/>📡 <b>中间件与通信</b><br/>ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps · iceoryx 2.95.4.2 · AimRT+aimrt_py<br/><br/>🧠 <b>AI 推理运行时</b><br/>onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx（rk）<br/>TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3（orin）<br/><br/>🎬 <b>多媒体与图像</b><br/>OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg · MPP · RGA<br/><br/>🖼 <b>UI 与音频</b><br/>flutter-pi+Flutter · Qt 5.15.3 · PipeWire 1.6.8<br/><br/>⚙ <b>系统与网络服务</b><br/>systemd · NetworkManager · hostapd/dnsmasq · mosquitto · ptp4l/chrony · can-utils<br/><br/>🔑 <b>商业 SDK 与语言运行时</b><br/>科大讯飞 VTN/ESR/听写 · omnis_sdk 4.0.0 · Python 3.10 · C++20<br/><br/>🏗 <b>构建与代码生成</b><br/>colcon+CMake 工作空间 · AimRT RPC 代码生成脚本 · Rust 工具链（orin）<br/><br/>🔍 <b>调试与观测</b><br/>ros2 CLI · tegrastats · jetson-stats 7.2.1 · iox-introspection 工具集 · em_run_asan.sh（ASan）· AimRT monitor/viz 插件</th></tr>
-<tr><th>层 ↓ / 部分 →</th><th><b>交互业务（非实时）</b><br/>interaction/system/auxiliary.slice</th><th><b>运控执行（实时）</b><br/>realtime.slice · 隔离核</th><th><b>复杂感知与规划</b></th></tr>
-<tr><th><b>具身业务层</b></th><td><b>业务大脑</b>：Agent 对话智能体（/aimrt_agent_node · ★asr_result/PlayTts）· 任务引擎 task_engine（/task_engine · AmRequest 仲裁）· SM 状态机（/sm · sm/system_state）<br/><b>交互表现</b>：audio_manager（★PlayAudioFile/Get·SetVolume）· display_ui 胸屏 · lumina 灯效 · scene_engine 场景<br/><b>系统与运维</b>：housekeeper+app_proxy（ConnectRobot/网络/权限）· hds · cloud_proxy · ota · data_exporter · drp 录包 · abox<br/><b>传感与外设</b>：hal_sensor（★bms/touch · SetServo · LedStripCommand）· hal_camera/hal_rgbd rk 实例 · legged_odom（/odom·/tf）· 配件接入（rc/「圈圈」connx/insta360/rtsp/resource_manager）</td><td>mc 运动控制（/mc_ros2_node · ★SetMcAction/velocity/mc/common/state · RL 策略 onnxruntime@CPU3 · WBC · 动作 FSM）<br/>device_manager（/device_manager_node · 设备实时 IO）<br/>——同 realtime.slice：9×SCHED_RR 钉隔离核（§2.4）</td><td><b>感知与融合</b>：percep（分割/深度/检测@TensorRT）· coreon_fusion（27 路融合避障）· person_track+ReID（★follow_candidates）· brightness · nav2_perception（点云合并）<br/><b>导航与跟随</b>：Nav2 1.1.20（/robot_navigation · ★/navi/command · /navi/loadmap · 双层 costmap）· follow_node（★follow/state）· trajectory_tracker（★SpawnIntelligentMotionTask）<br/><b>传感接入</b>：hal_rgbd（5 目 ToF · ★SetHalTofStream）· hal_camera（双目/鱼眼/彩色+头部 IMU · ★CaptureJpegImage）· hal_sensor_soc1（ADU/温度）<br/>（部署未运行：aimrt_slam · aprilgrid_loc · map_manager）</td></tr>
-<tr><th><b>具身框架层</b></th><td>AimRT+aimrte · ROS 2 Humble+FastDDS · iceoryx 零拷贝 · em/process_manager0 + aimdk_msgs ｜ 推理运行时：onnxruntime · RKNN · MNN · sherpa-onnx</td><td>iceoryx 零拷贝实时通道 · onnxruntime 实时推理 · AimRT 轻量执行器</td><td>ROS 2 Humble + Nav2 框架 · TensorRT 10.7+CUDA 12.6+cuDNN · OpenCV · AimRT · em/process_manager1</td></tr>
-<tr><th><b>OS 层</b></th><td>Ubuntu 22.04.5（kernel 6.1.141-rk3576）· systemd（em.service+robot.slice）· PipeWire · NetworkManager/hostapd/dnsmasq · mosquitto · ptp4l+chrony</td><td><b>与左列同板共享内核（无 PREEMPT_RT）</b>；实时性 = isolcpus=2,3 + SCHED_RR 80/85（§2.4）</td><td>Ubuntu 22.04.5 + L4T R36.4.4（JetPack 6.2）· systemd · NV 多媒体栈（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l</td></tr>
-<tr><th><b>驱动层</b></th><td>Mali kbase（GPU）· RKNPU v0.9.8（NPU）· CAN · stmmac+YT9215RB 交换 · V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA</td><td>CAN0/1 驱动（硬中断 irq83/84 @CPU2）</td><td>nvgpu 540.4.0 · V4L2/NvArgus（camera-start insmod）· GMSL 相机驱动（ox05bis/max96724）· NVDEC/NVENC · 千兆以太</td></tr>
-<tr><th><b>硬件层</b></th><td>rk3576 SoC（8 核 A53+A72 · Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB）· eMMC 116.5G · WiFi/BT · YT9215RB+对外 RJ45 · 本体传感器</td><td>CAN0/CAN1 总线 · 14× 关节执行器 + 主控 MCU</td><td>Orin Nano Super SoC（6×A78AE · Ampere GPU 1024CUDA+32TC · 统一 LPDDR5 8GB/102.4GB/s）· NVMe 238.5G · 头部相机阵列（双目/鱼眼/彩色/5 目 ToF）</td></tr>
-</table>
+![图 7-1 分层系统架构图（双板纵切 × 五层横切 × 工具链纵贯）](figures/fig-7-1-layered-arch.svg)
 
-**连接关系**（表格不含连线，接口与连接如下，详图见 §7.2/§7.4）：
-
-- **外部生态 → 运控板**：App/云/遥控器/圈圈/Insta360 全部终结于 rk 各接入模块（MQTT/TLS、蓝牙、BLE+UWB、WiFi）；开发 PC 经有线直连 10.1.1.0/24，★接口面可直连双板任意服务/话题（FastDDS 域 0）。
-- **rk 两列之间（板内）**：task_engine → ★SetMcAction/velocity 下发；mc → mc/common/state★ 上报（经 iceoryx/DDS）。
-- **运控执行列内部**：mc@CPU3（RL 策略推理）→ CAN 驱动@CPU2 → 14 关节执行器（1kHz 级实时环）。
-- **跨板（rk ⇄ orin）**：内部以太网 10.1.1.0/24 · FastDDS 域 0，只走结果级数据（目标/点云/代价图 ↑、任务指令 ↓）。
-- **工具链 → 各层**：以运行时库注入（中间件/推理/多媒体/UI）+ 构建产物（colcon/代码生成）+ 调测接入（ros2 CLI/tegrastats/ASan 等）。
+> **图 7-1 读法**：行=五层（业务→框架→OS→驱动→硬件，上层依赖下层）、列=纵切三部分（rk 交互业务 / rk 运控执行 / orin 感知规划）、最右列=工具链纵贯（全高）。
+> **连线与交互**（图上带编号的箭头）：**① 板内**（rk 业务⇄运控，iceoryx/DDS）——task_engine→★SetMcAction/velocity ↓，mc→★mc/common/state ↑；**② 跨板·任务与感知**（rk 业务⇄orin，FastDDS 域 0）——FollowTaskCtrl/★navi 指令 ↓，★follow_candidates/点云/代价图、/odom·/tf ↑（只走结果级数据，相机原图板内消化）；**③ 跨板·速度直连**（orin→MC）——nav2/follow/运镜发布 velocity(pnc/follow)，MC 按 SetMcInputSource 仲裁；**外部接入**——App→app_proxy(TRRO/鉴权)、云→cloud_proxy(MQTT/TLS)、遥控器→rc(蓝牙)、圈圈→connx(BLE+UWB)、Insta360→insta360(WiFi)，全部终结于 rk；PC ★接口面 FastDDS 直连双板；**虚线**=工具链注入。模块级全量接口见 §7.4，连接视角见 §7.2。
 
 读图要点（含对本图排版方案的事实核对，依据 §1–§6 实测）：
 

@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="846" viewBox="0 0 1560 846">
+<defs><marker id="ah" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#35495e"/></marker></defs>
+<rect x="0" y="0" width="1560" height="846" fill="#ffffff"/>
+<rect x="20" y="20" width="1096" height="46" rx="6" fill="#e8f1fb" stroke="#7fa8cc" stroke-width="1.2"/>
+<text x="34" y="49" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="13" fill="#1c3d5f" font-weight="700">☁ 外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板</text>
+<line x1="206" y1="67" x2="206" y2="82" stroke="#35495e" stroke-width="1.2" marker-end="url(#ah)"/>
+<line x1="306" y1="67" x2="306" y2="82" stroke="#35495e" stroke-width="1.2" marker-end="url(#ah)"/>
+<line x1="406" y1="67" x2="406" y2="82" stroke="#35495e" stroke-width="1.2" marker-end="url(#ah)"/>
+<text x="20" y="78" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="10.5" fill="#4a5b6c">[接入] App→app_proxy(TRRO/鉴权) · 云→cloud_proxy(MQTT/TLS) · 遥控器→rc(蓝牙) · 圈圈→connx(BLE+UWB) · Insta360→insta360(WiFi) · PC→★接口面(FastDDS 直连双板)</text>
+<rect x="116" y="84" width="672" height="34" rx="6" fill="#dce9f7" stroke="#5b87b5" stroke-width="1.2"/>
+<text x="128" y="106" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="13" fill="#1f2933" font-weight="700">🖥 运控板 rk3576（soc0 · 10.1.1.100 · 8 核 · CPU2/3 隔离）</text>
+<rect x="796" y="84" width="320" height="34" rx="6" fill="#eadff5" stroke="#8d6fb4" stroke-width="1.2"/>
+<text x="806" y="106" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="13" fill="#1f2933" font-weight="700">🧠 大脑板 Orin Nano Super（soc1）</text>
+<rect x="1140" y="84" width="400" height="34" rx="6" fill="#fdf3d0" stroke="#c9a24b" stroke-width="1.2"/>
+<text x="1152" y="106" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="13" fill="#1f2933" font-weight="700">🧰 三方工具链（纵贯两板 · 版本见 §6.1）</text>
+<rect x="116" y="122" width="378" height="28" rx="6" fill="#f2f7fc" stroke="#8aa8c4" stroke-width="1"/>
+<text x="126" y="141" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.5" fill="#1f2933" font-weight="700">交互业务（非实时）interaction/system/auxiliary.slice</text>
+<rect x="506" y="122" width="282" height="28" rx="6" fill="#fdf1ea" stroke="#c49a82" stroke-width="1"/>
+<text x="516" y="141" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.5" fill="#1f2933" font-weight="700">运控执行（实时）realtime.slice · 隔离核</text>
+<rect x="796" y="122" width="320" height="28" rx="6" fill="#f6f0fb" stroke="#a48ec4" stroke-width="1"/>
+<text x="806" y="141" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.5" fill="#1f2933" font-weight="700">复杂感知与规划</text>
+<text x="120" y="155" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="10.8" fill="#35495e">① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑</text>
+<line x1="185" y1="163" x2="647" y2="163" stroke="#35495e" stroke-width="1.6" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="120" y="175" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="10.8" fill="#35495e">② 跨板·任务与感知（FastDDS 域0）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑</text>
+<line x1="305" y1="183" x2="956" y2="183" stroke="#35495e" stroke-width="1.6" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="687" y="195" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="10.8" fill="#35495e">③ 跨板·速度直连：orin velocity(pnc/follow/运镜)→MC（SetMcInputSource 仲裁）</text>
+<line x1="956" y1="203" x2="647" y2="203" stroke="#35495e" stroke-width="1.6" marker-end="url(#ah)"/>
+<line x1="1140" y1="183" x2="1116" y2="183" stroke="#35495e" stroke-width="1.3" marker-start="url(#ah)" marker-end="url(#ah)" stroke-dasharray="5,4"/>
+<rect x="20" y="214" width="92" height="272" rx="6" fill="#eaf3ff" stroke="#9aa8b5" stroke-width="1"/>
+<text x="30" y="354" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="12" fill="#33414e" font-weight="700">具身业务层</text>
+<rect x="116" y="214" width="378" height="272" rx="6" fill="#f7fafe" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="232" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">业务大脑</text>
+<text x="126" y="248" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Agent 对话智能体（★asr_result/PlayTts）</text>
+<text x="126" y="264" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">task_engine 任务引擎（AmRequest 仲裁）</text>
+<text x="126" y="280" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">SM 状态机（sm/system_state）</text>
+<text x="126" y="296" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">交互表现</text>
+<text x="126" y="312" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">audio_manager（★播放/音量）· display_ui 胸屏</text>
+<text x="126" y="328" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">lumina 灯效 · scene_engine 场景引擎</text>
+<text x="126" y="344" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">系统与运维</text>
+<text x="126" y="360" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">housekeeper+app_proxy · hds · cloud_proxy · ota</text>
+<text x="126" y="376" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">data_exporter · drp 录包 · abox 日志</text>
+<text x="126" y="392" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">传感与外设</text>
+<text x="126" y="408" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">hal_sensor（★bms/touch · SetServo · LedStripCommand）</text>
+<text x="126" y="424" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">legged_odom（/odom·/tf）· hal_camera/hal_rgbd rk 实例</text>
+<text x="126" y="440" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">配件：rc ·「圈圈」connx · insta360 · rtsp</text>
+<text x="126" y="456" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">resource_manager 资源/拍照</text>
+<rect x="506" y="214" width="282" height="272" rx="6" fill="#f7fafe" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="232" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">mc 运动控制（/mc_ros2_node）</text>
+<text x="516" y="248" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">★SetMcAction · velocity（指令下发）</text>
+<text x="516" y="264" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">★mc/common/state（全量状态上报）</text>
+<text x="516" y="280" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">RL 策略 onnxruntime@CPU3 实时推理</text>
+<text x="516" y="296" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">WBC 全身控制 · 动作 FSM</text>
+<text x="516" y="312" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">device_manager（设备实时 IO）</text>
+<text x="516" y="328" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">——同 realtime.slice（§2.4）</text>
+<text x="516" y="344" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">9×SCHED_RR 钉隔离核</text>
+<rect x="796" y="214" width="320" height="272" rx="6" fill="#f7fafe" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="232" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">感知与融合</text>
+<text x="806" y="248" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">percep（分割/深度/检测@TensorRT）</text>
+<text x="806" y="264" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">coreon_fusion（27 路融合）· person_track+ReID</text>
+<text x="806" y="280" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">（★follow_candidates）· brightness</text>
+<text x="806" y="296" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">nav2_perception（点云合并）</text>
+<text x="806" y="312" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">导航与跟随</text>
+<text x="806" y="328" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Nav2 1.1.20（★/navi/command · /navi/loadmap）</text>
+<text x="806" y="344" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">follow_node（★follow/state）</text>
+<text x="806" y="360" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">trajectory_tracker（环绕运镜）</text>
+<text x="806" y="376" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933" font-weight="700">传感接入</text>
+<text x="806" y="392" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">hal_rgbd 5目ToF · hal_camera 相机阵列+IMU</text>
+<text x="806" y="408" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">hal_sensor_soc1（ADU/温度）</text>
+<text x="806" y="424" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">（部署未运行的清单见 §6.4.2）</text>
+<rect x="20" y="490" width="92" height="74" rx="6" fill="#f0f7ea" stroke="#9aa8b5" stroke-width="1"/>
+<text x="30" y="531" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="12" fill="#33414e" font-weight="700">具身框架层</text>
+<rect x="116" y="490" width="378" height="74" rx="6" fill="#f6faf2" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="508" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">AimRT+aimrte · ROS 2 Humble+FastDDS · iceoryx</text>
+<text x="126" y="524" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">em/process_manager0 + aimdk_msgs</text>
+<text x="126" y="540" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">推理运行时：ORT · RKNN · MNN · sherpa</text>
+<rect x="506" y="490" width="282" height="74" rx="6" fill="#f6faf2" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="508" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">iceoryx 零拷贝实时通道</text>
+<text x="516" y="524" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">onnxruntime 实时推理</text>
+<rect x="796" y="490" width="320" height="74" rx="6" fill="#f6faf2" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="508" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">ROS2+Nav2 框架 · TensorRT 10.7+CUDA12.6+cuDNN</text>
+<text x="806" y="524" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">OpenCV · AimRT · em/process_manager1</text>
+<rect x="20" y="568" width="92" height="74" rx="6" fill="#fdf6e3" stroke="#9aa8b5" stroke-width="1"/>
+<text x="30" y="609" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="12" fill="#33414e" font-weight="700">OS 层</text>
+<rect x="116" y="568" width="378" height="74" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="586" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Ubuntu 22.04.5（6.1.141）· systemd（em+robot.slice）</text>
+<text x="126" y="602" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">PipeWire · NM/hostapd/dnsmasq · mosquitto</text>
+<text x="126" y="618" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">ptp4l + chrony 时钟同步</text>
+<rect x="506" y="568" width="282" height="74" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="586" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">与左列同板共享内核（无 PREEMPT_RT）</text>
+<text x="516" y="602" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">实时性 = isolcpus=2,3</text>
+<text x="516" y="618" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">+ SCHED_RR 80/85（§2.4）</text>
+<rect x="796" y="568" width="320" height="74" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="586" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Ubuntu + L4T R36.4.4（JetPack 6.2）· systemd</text>
+<text x="806" y="602" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">NV 多媒体栈（NVDEC/NVENC/NVJPG/VIC/OFA）</text>
+<text x="806" y="618" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">ptp4l 时钟同步</text>
+<rect x="20" y="646" width="92" height="66" rx="6" fill="#f5eff7" stroke="#9aa8b5" stroke-width="1"/>
+<text x="30" y="683" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="12" fill="#33414e" font-weight="700">驱动层</text>
+<rect x="116" y="646" width="378" height="66" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="664" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Mali kbase · RKNPU v0.9.8 · CAN · stmmac+YT9215RB</text>
+<text x="126" y="680" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA</text>
+<rect x="506" y="646" width="282" height="66" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="664" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">CAN0/1 驱动（硬中断 irq83/84 @CPU2）</text>
+<rect x="796" y="646" width="320" height="66" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="664" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机</text>
+<text x="806" y="680" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">（ox05bis/max96724）· NVDEC/NVENC</text>
+<text x="806" y="696" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">千兆以太</text>
+<rect x="20" y="716" width="92" height="88" rx="6" fill="#fdeee6" stroke="#9aa8b5" stroke-width="1"/>
+<text x="30" y="764" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="12" fill="#33414e" font-weight="700">硬件层</text>
+<rect x="116" y="716" width="378" height="88" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="734" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">rk3576 SoC（8核 A53+A72 big.LITTLE）</text>
+<text x="126" y="750" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB</text>
+<text x="126" y="766" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">eMMC 116.5G · WiFi/BT · YT9215RB+RJ45</text>
+<text x="126" y="782" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">本体传感器（BMS/触摸/IMU…）</text>
+<rect x="506" y="716" width="282" height="88" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="734" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">CAN0/CAN1 总线</text>
+<text x="516" y="750" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">14× 关节执行器 + 主控 MCU</text>
+<rect x="796" y="716" width="320" height="88" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="734" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">Orin（6×A78AE · Ampere 1024CUDA+32TC）</text>
+<text x="806" y="750" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G</text>
+<text x="806" y="766" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.6" fill="#1f2933">头部相机阵列（双目/鱼眼/彩色/5目ToF）</text>
+<rect x="1140" y="124" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="141" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">📡 中间件与通信</text>
+<text x="1150" y="157" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps</text>
+<text x="1150" y="173" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">iceoryx 2.95.4.2 · AimRT + aimrt_py</text>
+<rect x="1140" y="195" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="212" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">🧠 AI 推理运行时</text>
+<text x="1150" y="228" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx</text>
+<text x="1150" y="244" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3</text>
+<rect x="1140" y="266" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="283" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">🎬 多媒体与图像</text>
+<text x="1150" y="299" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg</text>
+<text x="1150" y="315" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">MPP 1.5.0 · RGA 2.2.0</text>
+<rect x="1140" y="337" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="354" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">🖼 UI 与音频</text>
+<text x="1150" y="370" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">flutter-pi + Flutter · Qt 5.15.3</text>
+<text x="1150" y="386" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">PipeWire 1.6.8（PA 兼容 6001/4713）</text>
+<rect x="1140" y="408" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="425" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">⚙ 系统与网络服务</text>
+<text x="1150" y="441" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">systemd · NM · hostapd/dnsmasq · mosquitto</text>
+<text x="1150" y="457" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">ptp4l/chrony · can-utils</text>
+<rect x="1140" y="479" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="496" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">🔑 商业 SDK 与语言运行时</text>
+<text x="1150" y="512" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">讯飞 VTN/ESR/听写 · omnis_sdk 4.0.0</text>
+<text x="1150" y="528" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">Python 3.10 · C++20</text>
+<rect x="1140" y="550" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="567" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">🏗 构建与代码生成</text>
+<text x="1150" y="583" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">colcon+CMake 工作空间 · AimRT RPC 代码生成</text>
+<text x="1150" y="599" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">Rust 工具链（orin cargo/rustup）</text>
+<rect x="1140" y="621" width="400" height="66" rx="6" fill="#fffdf4" stroke="#d8c48a" stroke-width="1"/>
+<text x="1150" y="638" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933" font-weight="700">🔍 调试与观测</text>
+<text x="1150" y="654" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">ros2 CLI · tegrastats · jetson-stats 7.2.1</text>
+<text x="1150" y="670" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11.4" fill="#1f2933">iox-introspection · ASan · monitor/viz</text>
+<text x="20" y="826" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11" fill="#5b6b7a">图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。</text>
+<text x="20" y="842" font-family='Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif font-size="11" fill="#5b6b7a">列内链：运控执行列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。</text>
+</svg>
