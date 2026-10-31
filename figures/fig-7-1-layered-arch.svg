@@ -2,14 +2,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1078" viewBox="0 0 1560 1078">
 <rect x="0" y="0" width="1560" height="1078" fill="#ffffff"/>
 <rect x="20" y="4" width="1110" height="40" rx="6" fill="#e8f1fb" stroke="#7fa8cc" stroke-width="1.2"/>
-<text x="34" y="33" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">云服务；启元云端大模型：LLM 对话与语义理解 · 意图/任务生成 · 知识问答 —— 由运控板 Agent 发起调用</text>
+<text x="249" y="33" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">云服务；启元云端大模型：LLM 对话与语义理解 · 意图/任务生成 · 知识问答 —— 由运控板 Agent 发起调用</text>
 <line x1="450" y1="45" x2="450" y2="74" stroke="#35495e" stroke-width="1.2"/><polygon points="450,74 446,65 454,65" fill="#35495e"/><polygon points="450,45 454,54 446,54" fill="#35495e"/>
 <text x="462" y="66" font-family="Noto Sans CJK SC" font-size="10" fill="#1c3d5f">HTTPS/TLS 443 · aiem-gw.agibot.com /v1/session：LLM 对话/意图（Agent）；MQTT/TLS：状态/OTA</text>
 <text x="960" y="66" font-family="Noto Sans CJK SC" font-size="10" fill="#6b7a89">（大脑板无云端直连，云流量均经运控板）</text>
 <rect x="108" y="76" width="688" height="826" rx="10" fill="#ffffff" stroke="#5b87b5" stroke-width="2"/>
-<text x="114" y="95" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">运控板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）</text>
+<text x="281" y="95" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">运控板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）</text>
 <rect x="802" y="76" width="336" height="826" rx="10" fill="#ffffff" stroke="#8d6fb4" stroke-width="2"/>
-<text x="808" y="95" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">大脑板 Orin Nano（6×ARM + Orin 67TOPS）</text>
+<text x="829" y="95" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">大脑板 Orin Nano（6×ARM + Orin 67TOPS）</text>
 <rect x="116" y="102" width="378" height="666" rx="8" fill="#f2f7fc" stroke="#8aa8c4" stroke-width="1.4"/>
 <rect x="506" y="102" width="282" height="666" rx="8" fill="#fdf1ea" stroke="#c49a82" stroke-width="1.4"/>
 <rect x="810" y="102" width="320" height="666" rx="8" fill="#f6f0fb" stroke="#a48ec4" stroke-width="1.4"/>

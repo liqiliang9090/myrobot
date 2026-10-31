@@ -143,9 +143,10 @@ LBL_FILLS = ['#eaf3ff', '#f0f7ea', '#fdf6e3', '#f5eff7', '#fdeee6']
 
 # ---------- 启元云端大模型带 + 接入行 ----------
 S.append(box(LBL_X, EXT_Y, (C3_X + C3_W) - LBL_X, EXT_H, '#e8f1fb', '#7fa8cc', 1.2))
-t, _ = text_block(LBL_X + 14, EXT_Y + 29,
+t, _ = text_block(0, EXT_Y + 29,
                   [('云服务；启元云端大模型：LLM 对话与语义理解 · 意图/任务生成 · 知识问答 —— 由运控板 Agent 发起调用', True)],
-                  fs=13, color='#1c3d5f', maxw=(C3_X + C3_W) - LBL_X - 28)
+                  fs=13, color='#1c3d5f',
+                  center=(LBL_X + (C3_X + C3_W)) // 2, maxw=(C3_X + C3_W) - LBL_X - 28)
 S.append(t)
 # 云端连接（实测 2026-10-31）：仅运控板有云链路；大脑板无直连
 S.append(arrow(450, EXT_Y + EXT_H + 1, 450, BOARD_Y0 - 2, both=True, sw=1.2))
@@ -158,8 +159,8 @@ S.append(t)
 # ---------- 板框（含部分框四层 + 硬件层） ----------
 def draw_board(bx, bw, title, stroke):
     S.append(box(bx, BOARD_Y0, bw, BOARD_BOT - BOARD_Y0, '#ffffff', stroke, 2, rx=10))
-    t, _ = text_block(bx + 6, BOARD_Y0 + 19, [(title, True)], fs=13, color='#1c3d5f',
-                      maxw=bw - 12)                   # 板标题在框内顶部条带（框包住标题）
+    t, _ = text_block(0, BOARD_Y0 + 19, [(title, True)], fs=13, color='#1c3d5f',
+                      center=bx + bw // 2, maxw=bw - 12)   # 板标题框内顶部条带居中
     S.append(t)
 
 draw_board(C1_X - PAD, (C2_X + C2_W + PAD) - (C1_X - PAD),
