@@ -79,7 +79,7 @@ BIZ_COLS = [
   ('Agent 智能体', ['★asr_result/PlayTts · LLM 对话与意图']),
   ('task_engine 任务引擎', ['AmRequest 仲裁 · 长任务编排']),
   ('SM 状态机', ['sm/system_state · SmNodeService 驱动各应用']),
-  ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
+  ('交互呈现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
  ],
  [  # rk·运控：mc 对上暴露 ★接口；CPU2/CPU3 隔离核业务显式标注
   ('mc 运动控制', ['★SetMcAction·velocity（指令下发）', '★mc/common/state（全量状态）', 'CPU3 独占：RL·WBC·动作 FSM', 'CPU2：CAN 硬中断 + dm 设备 IO']),
