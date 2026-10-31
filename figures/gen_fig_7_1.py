@@ -2,7 +2,7 @@
 # 生成 §7.1 分层系统架构图（双板纵切 × 五层横切 × 工具链纵贯）SVG
 # 用法：python3 figures/gen_fig_7_1.py  →  figures/fig-7-1-layered-arch.svg
 OVERFLOW = []
-FONT = "'Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif"
+FONT = "Noto Sans CJK SC"
 
 def esc(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
@@ -23,7 +23,7 @@ def text_block(x, y, lines, fs=12, lh=None, color='#1f2933', maxw=None, tag=''):
             w = est_w(t, fs)
             if w > maxw:
                 OVERFLOW.append((round(w), maxw, t))
-        out.append(f'<text x="{x}" y="{y}" font-family={FONT} font-size="{fs}" '
+        out.append(f'<text x="{x}" y="{y}" font-family="{FONT}" font-size="{fs}" '
                    f'fill="{color}"{" font-weight=\"700\"" if b else ""}>{esc(t)}</text>')
         y += lh
     return '\n'.join(out), y
@@ -39,6 +39,7 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
             f'{m}marker-end="url(#ah)"{d}/>')
 
 S = []
+S.append('<?xml version="1.0" encoding="UTF-8"?>')
 S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="872" viewBox="0 0 1560 872">')
 S.append('<defs><marker id="ah" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">'
          '<path d="M0,0 L9,4 L0,8 z" fill="#35495e"/></marker></defs>')
@@ -68,10 +69,10 @@ TC_BOT = MAT_BOT
 # ---------- 外部生态带（跨矩阵三列宽） ----------
 S.append(box(LBL_X, EXT_Y, (C3_X + C3_W) - LBL_X, EXT_H, '#e8f1fb', '#7fa8cc', 1.2))
 t, _ = text_block(LBL_X + 14, EXT_Y + 29,
-                  [('☁ 外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板', True)],
+                  [('外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板', True)],
                   fs=13, color='#1c3d5f', maxw=(C3_X + C3_W) - LBL_X - 28, tag='ext')
 S.append(t)
-for ax in (C1_X + 90, C1_X + 190, C1_X + 290):   # 外部→rk 三个小箭头
+for ax in (900, 1000, 1060):                      # 外部→rk 三个小箭头（右移避让接入行文字）
     S.append(arrow(ax, EXT_Y + EXT_H + 1, ax, HDR_Y - 2, both=False, sw=1.2))
 t, _ = text_block(LBL_X, 78, [('[接入] App→app_proxy(TRRO/鉴权) · 云→cloud_proxy(MQTT/TLS) · 遥控器→rc(蓝牙) · 圈圈→connx(BLE+UWB) · Insta360→insta360(WiFi) · PC→★接口面(FastDDS 直连双板)', False)],
                   fs=10.5, color='#4a5b6c')
@@ -79,15 +80,15 @@ S.append(t)
 
 # ---------- 板头行 ----------
 S.append(box(C1_X, HDR_Y, (C2_X + C2_W) - C1_X, HDR_H, '#dce9f7', '#5b87b5', 1.2))
-t, _ = text_block(C1_X + 12, HDR_Y + 22, [('🖥 运控板 rk3576（soc0 · 10.1.1.100 · 8 核 · CPU2/3 隔离）', True)],
+t, _ = text_block(C1_X + 12, HDR_Y + 22, [('运控板 rk3576（soc0 · 10.1.1.100 · 8 核 · CPU2/3 隔离）', True)],
                   fs=13, maxw=(C2_X + C2_W) - C1_X - 24)
 S.append(t)
 S.append(box(C3_X, HDR_Y, C3_W, HDR_H, '#eadff5', '#8d6fb4', 1.2))
-t, _ = text_block(C3_X + 10, HDR_Y + 22, [('🧠 大脑板 Orin Nano Super（soc1）', True)], fs=13, maxw=C3_W - 20)
+t, _ = text_block(C3_X + 10, HDR_Y + 22, [('大脑板 Orin Nano Super（soc1）', True)], fs=13, maxw=C3_W - 20)
 S.append(t)
 # 工具链条头
 S.append(box(TC_X, HDR_Y, TC_W, HDR_H, '#fdf3d0', '#c9a24b', 1.2))
-t, _ = text_block(TC_X + 12, HDR_Y + 22, [('🧰 三方工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13, maxw=TC_W - 24)
+t, _ = text_block(TC_X + 12, HDR_Y + 22, [('◆ 三方工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13, maxw=TC_W - 24)
 S.append(t)
 
 # ---------- 部分行 ----------
@@ -212,14 +213,14 @@ for i, (name, h, _) in enumerate(LAYERS):
 
 # ---------- 工具链纵贯列（8 组小框） ----------
 groups = [
- ('📡 中间件与通信', ['ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps', 'iceoryx 2.95.4.2 · AimRT + aimrt_py']),
- ('🧠 AI 推理运行时', ['onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx', 'TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3']),
- ('🎬 多媒体与图像', ['OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg', 'MPP 1.5.0 · RGA 2.2.0']),
- ('🖼 UI 与音频', ['flutter-pi + Flutter · Qt 5.15.3', 'PipeWire 1.6.8（PA 兼容 6001/4713）']),
- ('⚙ 系统与网络服务', ['systemd · NM · hostapd/dnsmasq · mosquitto', 'ptp4l/chrony · can-utils']),
- ('🔑 商业 SDK 与语言运行时', ['讯飞 VTN/ESR/听写 · omnis_sdk 4.0.0', 'Python 3.10 · C++20']),
- ('🏗 构建与代码生成', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
- ('🔍 调试与观测', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
+ ('◆ 中间件与通信', ['ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps', 'iceoryx 2.95.4.2 · AimRT + aimrt_py']),
+ ('◆ AI 推理运行时', ['onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx', 'TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3']),
+ ('◆ 多媒体与图像', ['OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg', 'MPP 1.5.0 · RGA 2.2.0']),
+ ('◆ UI 与音频', ['flutter-pi + Flutter · Qt 5.15.3', 'PipeWire 1.6.8（PA 兼容 6001/4713）']),
+ ('◆ 系统与网络服务', ['systemd · NM · hostapd/dnsmasq · mosquitto', 'ptp4l/chrony · can-utils']),
+ ('◆ 商业 SDK 与语言运行时', ['讯飞 VTN/ESR/听写 · omnis_sdk 4.0.0', 'Python 3.10 · C++20']),
+ ('◆ 构建与代码生成', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
+ ('◆ 调试与观测', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
 ]
 gy = HDR_Y + HDR_H + 6
 avail = TC_BOT - gy
@@ -241,6 +242,11 @@ S.append(t)
 S.append('</svg>')
 out = '\n'.join(S)
 open('figures/fig-7-1-layered-arch.svg', 'w', encoding='utf-8').write(out)
+try:
+    import cairosvg
+    cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=2)
+except Exception as e:
+    print('PNG 跳过（无 cairosvg）:', e)
 if OVERFLOW:
     for w, m, t in OVERFLOW: print(f'溢出 {w}>{m}: {t}')
     raise SystemExit(1)
