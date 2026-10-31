@@ -69,3 +69,28 @@
 
 - [中新网：启元第 5000 台下线，欧菲光全栈感知方案](https://www.chinanews.com.cn/cj/2026/10-30/10723321.shtml)——「七路融合感知：双目 RGB + 5 路 ToF + 6 轴 IMU」。
 - 本机实测合计：3×5MP RGB（rk 1×ox05bis + orin 2×ofilm_x5b）+ 5×ToF + BMI08 IMU（rk）。
+
+## 8. 视频流路径补充实测（同日晚间，视频流是否跨板专项）
+
+问题：两板都有 hal_camera，视频流是否在板间流动？
+
+**进程活跃度（ps pcpu，静置态持续运行）：**
+- rk：aima-agent-app **105%**（交互视觉+语音前端持续跑，NPU Core0 29%/Core1 9%）、hal_camera(rk) **13.9%**（ox05bis 持续采集）、rtsp_server 0.5%（待 App 连接）
+- orin：hal_camera(orin) **42.9%**（2×x5b 持续采集）、hal_rgbd **38.9%**（5×ToF 数据面）、percep ~10% + nav2_perception ~6%
+
+**板间链路流量（orin unused0 口 /proc/net/dev 5s 采样）：**
+下行 155KB/s + 上行 80KB/s ≈ **2 Mbps** —— 远低于任何一路视频流
+（864×648@10fps NV12 ≈67Mbps；2592×1944 原始 ≈750Mbps）→ **视频零跨板**，
+板间只跑结果级数据（点云/目标/代价图/指令）+ soc_sync/inter_board 同步信号。
+
+**消费方配置实证：**
+- orin percep（percep_aimrt.yaml）：订阅 `/aima/hal/camera/head_stereo_left/right`
+  （orin 本地双目）+ `/ofilm/tof/{main,rear,front}/point_cloud`；输出 /percep/cloud、
+  /percep/detect/env 等 —— ROS 图上 head_stereo_left 订阅数=1 即 percep，
+  发布者走 iceoryx（0 ROS 发布者）
+- rk Agent（agent.yaml）：`image_capture_topic: /aima/hal/camera/bgr_camera_l`
+- rk rtsp（rtsp_server_t1_v2d0_sub.yaml）：iceoryx 订阅 nv12_l/nv12_r → MPP 编码供 App
+
+**结论**：两板 hal_camera 同时各自采集，但读的是各自直连的不同相机——
+rk=交互视觉（人脸/手势，NPU 就地推理），orin=感知/导航（双目+ToF，TRT 就地推理）。
+"计算跟着传感器走"，无跨板视频，无性能瓶颈。
