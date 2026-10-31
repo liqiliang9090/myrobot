@@ -38,10 +38,10 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
 
 S = []
 S.append('<?xml version="1.0" encoding="UTF-8"?>')
-S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="930" viewBox="0 0 1560 930">')
+S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1110" viewBox="0 0 1560 1110">')
 S.append('<defs><marker id="ah" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">'
          '<path d="M0,0 L9,4 L0,8 z" fill="#35495e"/></marker></defs>')
-S.append('<rect x="0" y="0" width="1560" height="930" fill="#ffffff"/>')
+S.append('<rect x="0" y="0" width="1560" height="1110" fill="#ffffff"/>')
 
 # ---------- 版面常量 ----------
 LBL_X, LBL_W = 20, 92
@@ -51,7 +51,7 @@ C3_X, C3_W = 796, 320                 # orin
 TC_X, TC_W = 1140, 400                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
-ROW_H = [290, 74, 74, 66]             # 业务/框架/OS/驱动（部分框内四层）
+ROW_H = [455, 74, 74, 66]             # 业务(模块框化)/框架/OS/驱动（部分框内四层）
 HW_H = 88                             # 硬件层（板框内、部分框外）
 EXT_Y, EXT_H = 20, 46
 
@@ -66,50 +66,29 @@ HW_BOT = HW_Y + HW_H                                  # 768
 BOARD_BOT = HW_BOT + PAD                              # 776
 
 # ---------- 内容 ----------
-biz_c1 = [
- ('Agent 智能体', True),
- ('Agent 对话智能体（★asr_result/PlayTts）', False),
- ('task_engine 任务引擎（AmRequest 仲裁）', False),
- ('SM 状态机（sm/system_state）', False),
- ('交互表现', True),
- ('audio_manager（★播放/音量）· display_ui 胸屏', False),
- ('lumina 灯效 · scene_engine 场景引擎', False),
- ('系统与运维', True),
- ('housekeeper+app_proxy · hds · cloud_proxy · ota', False),
- ('data_exporter · drp 录包 · abox 日志', False),
- ('板基座：sys_guard · iox-roudi · tetherd · secret_store', False),
- ('传感与外设', True),
- ('hal_sensor（★bms/touch · SetServo · LedStripCommand）', False),
- ('legged_odom（/odom·/tf）· hal_camera/hal_rgbd rk 实例', False),
- ('配件：rc ·「圈圈」connx · insta360 · rtsp', False),
- ('resource_manager 资源/拍照', False),
+BIZ_COLS = [
+ [  # rk·交互业务：对外接口与依赖方在上，数据源与板基座在下
+  ('housekeeper + app_proxy', ['App 接入鉴权 · 网络/蓝牙/权限（ConnectRobot）']),
+  ('Agent 智能体', ['★asr_result/PlayTts · LLM 对话与意图']),
+  ('task_engine 任务引擎', ['AmRequest 仲裁 · 长任务编排']),
+  ('SM 状态机', ['sm/system_state · SmNodeService 驱动各应用']),
+  ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
+  ('运维链', ['hds · cloud_proxy · ota · data_exporter · drp · abox']),
+  ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'legged_odom（/odom·/tf）· rk 相机/ToF 实例', '配件：rc · 圈圈 · insta360 · resource_manager']),
+  ('板基座', ['sys_guard · iox-roudi · tetherd · secret_store']),
+ ],
+ [  # rk·运控：mc 对上暴露 ★接口，device_manager 为更底层设备 IO
+  ('mc 运动控制', ['★SetMcAction · velocity（指令下发）', '★mc/common/state（全量状态上报）', 'RL 策略@CPU3 · WBC · 动作 FSM']),
+  ('device_manager 设备实时 IO', ['与 mc 同 realtime.slice（§2.4）', '9×SCHED_RR 钉隔离核']),
+ ],
+ [  # orin：任务产出层在上，感知融合居中，传感数据源与板基座在下
+  ('导航与跟随', ['Nav2 1.1.20（★navi 指令/地图加载）', 'follow_node（★follow/state）', 'trajectory_tracker（环绕运镜）']),
+  ('感知与融合', ['percep（分割/深度/检测@TRT）', 'coreon_fusion（27 路融合）', 'person_track+ReID（★follow_candidates）', 'brightness · nav2_perception（点云合并）']),
+  ('传感接入', ['hal_rgbd 5目ToF · hal_camera 相机阵列+IMU', 'hal_sensor_soc1（ADU/温度）']),
+  ('板基座', ['sys_guard · ota_slave · data_exporter', '（部署未运行清单见 §6.4.2）']),
+ ],
 ]
-biz_c2 = [
- ('mc 运动控制（/mc_ros2_node）', True),
- ('★SetMcAction · velocity（指令下发）', False),
- ('★mc/common/state（全量状态上报）', False),
- ('RL 策略 onnxruntime@CPU3 实时推理', False),
- ('WBC 全身控制 · 动作 FSM', False),
- ('device_manager（设备实时 IO）', True),
- ('——同 realtime.slice（§2.4）', False),
- ('9×SCHED_RR 钉隔离核', False),
-]
-biz_c3 = [
- ('感知与融合', True),
- ('percep（分割/深度/检测@TensorRT）', False),
- ('coreon_fusion（27 路融合）· person_track+ReID', False),
- ('（★follow_candidates）· brightness', False),
- ('nav2_perception（点云合并）', False),
- ('导航与跟随', True),
- ('Nav2 1.1.20（★/navi/command · /navi/loadmap）', False),
- ('follow_node（★follow/state）', False),
- ('trajectory_tracker（环绕运镜）', False),
- ('传感接入', True),
- ('hal_rgbd 5目ToF · hal_camera 相机阵列+IMU', False),
- ('hal_sensor_soc1（ADU/温度）', False),
- ('板基座：sys_guard · ota_slave · data_exporter', False),
- ('（部署未运行的清单见 §6.4.2）', False),
-]
+
 fw_c1 = [
  ('AimRT+aimrte · ROS 2 Humble+FastDDS · iceoryx', False),
  ('em/process_manager0 + aimdk_msgs', False),
@@ -131,21 +110,21 @@ dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84 @CPU2）', False)]
 dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机', False),
          ('（ox05bis/max96724）· NVDEC/NVENC', False),
          ('千兆以太', False)]
-hw_c1 = [('rk3576 SoC（8核 A53+A72 big.LITTLE）', False),
+hw_c1 = [('rk3576 SoC：业务核 = 4×A72 大核 + 2×A53 小核', True),
          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
-         ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45', False),
-         ('本体传感器（BMS/触摸/IMU…）', False)]
-hw_c2 = [('CAN0/CAN1 总线', False),
-         ('14× 关节执行器 + 主控 MCU', False)]
+         ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45 · 本体传感器', False)]
+hw_c2 = [('隔离小核 ×2（CPU2/CPU3）', True),
+         ('CPU2：CAN0/1 硬中断 + dm 实时线程', False),
+         ('CPU3：MC 运控独占（36 线程）', False),
+         ('CAN0/1 总线 → 14× 关节执行器 + MCU', False)]
 hw_c3 = [('Orin（6×A78AE · Ampere 1024CUDA+32TC）', False),
          ('统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G', False),
          ('头部相机阵列（双目/鱼眼/彩色/5目ToF）', False)]
 
-ROWS = [('具身业务层', (biz_c1, biz_c2, biz_c3)),
-        ('具身框架层', (fw_c1, fw_c2, fw_c3)),
+ROWS = [('具身框架层', (fw_c1, fw_c2, fw_c3)),
         ('OS 层', (os_c1, os_c2, os_c3)),
         ('驱动层', (dr_c1, dr_c2, dr_c3))]
-FILLS = ['#f7fafe', '#f6faf2', '#fefaf0', '#faf6fb']
+FILLS = ['#f6faf2', '#fefaf0', '#faf6fb']
 HW_FILL = '#fef6f1'
 LBL_FILLS = ['#eaf3ff', '#f0f7ea', '#fdf6e3', '#f5eff7', '#fdeee6']
 
@@ -182,10 +161,31 @@ for px, pw, pname, pfill, pstroke in PARTS:
                       center=px + pw // 2, maxw=pw - 12)
     S.append(t)
 
-# 四层单元格（三列共享行坐标）
+# 具身业务层：每模块独立成框（上=对外接口/依赖方，下=被依赖底座/数据源）
+def draw_module(px, pw, y, title, lines):
+    h = 17 + int(16.5 * len(lines)) + 9
+    S.append(box(px + 6, y, pw - 12, h, '#ffffff', '#9db3c8', 1, rx=5))
+    t, _ = text_block(px + 16, y + 15, [(title, True)] + [(l, False) for l in lines],
+                      fs=11.6, maxw=pw - 26)
+    S.append(t)
+    return y + h + 4
+
+yt = row_y[0]
+S.append(box(LBL_X, yt, LBL_W, ROW_H[0], LBL_FILLS[0], '#9aa8b5', 1))
+t, _ = text_block(0, yt + ROW_H[0] // 2 + 4, [('具身业务层', True)], fs=12, color='#33414e',
+                  center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
+S.append(t)
+for ci, (px, pw, *_ ) in enumerate(PARTS):
+    S.append(box(px, yt, pw, ROW_H[0], '#f7fafe', '#a8b4c0', 1))
+    y = yt + 8
+    for title, lines in BIZ_COLS[ci]:
+        y = draw_module(px, pw, y, title, lines)
+    assert y <= yt + ROW_H[0] + 4, f'业务层模块纵向溢出(列{ci})'
+
+# 其余三层单元格（三列共享行坐标）
 for ri, (lname, cont) in enumerate(ROWS):
     yt = row_y[ri]; h = ROW_H[ri]
-    S.append(box(LBL_X, yt, LBL_W, h, LBL_FILLS[ri], '#9aa8b5', 1))
+    S.append(box(LBL_X, yt, LBL_W, h, LBL_FILLS[ri + 1], '#9aa8b5', 1))
     t, _ = text_block(0, yt + h // 2 + 4, [(lname, True)], fs=12, color='#33414e',
                       center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
     S.append(t)
@@ -244,6 +244,7 @@ S.append(arrow(TC_X, AY2, C3_X + C3_W, AY2, dash='5,4', sw=1.3))
 # ---------- 图例 ----------
 t, _ = text_block(LBL_X, BOARD_BOT + 110, [
     ('图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。', False),
+    ('业务层模块框序：自上而下＝依赖方向（上＝对外接口/依赖方，下＝被依赖底座与数据源）。', False),
     ('列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。', False)],
     fs=11, color='#5b6b7a', lh=16)
 S.append(t)
