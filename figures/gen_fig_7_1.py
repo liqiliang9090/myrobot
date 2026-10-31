@@ -57,7 +57,7 @@ C3_X, C3_W = 796, 320                 # orin
 TC_X, TC_W = 1140, 400                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
-ROW_H = [420, 78, 102, 70]            # 业务(模块框化)/框架/OS(含外包框标题带)/驱动（部分框内四层）
+ROW_H = [310, 78, 102, 126]           # 业务(模块框化)/框架/OS(含外包框标题带)/驱动(含传感直连内容)（部分框内四层）
 HW_H = 112                            # 硬件层（板框内、部分框外；rk 侧含外包框标题带）
 EXT_Y, EXT_H = 20, 46
 
@@ -74,22 +74,20 @@ BOARD_BOT = HW_BOT + PAD                              # 776
 
 # ---------- 内容 ----------
 BIZ_COLS = [
- [  # rk·交互业务：对外接口与依赖方在上，数据源在下（运维链移入工具链列，板基座不画）
+ [  # rk·交互业务：对外接口与依赖方在上（传感直连内容已并入驱动层格，运维链移入工具链列，板基座不画）
   ('housekeeper + app_proxy', ['App 接入鉴权 · 网络/蓝牙/权限（ConnectRobot）']),
   ('Agent 智能体', ['★asr_result/PlayTts · LLM 对话与意图']),
   ('task_engine 任务引擎', ['AmRequest 仲裁 · 长任务编排']),
   ('SM 状态机', ['sm/system_state · SmNodeService 驱动各应用']),
   ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
-  ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'hal_camera：头部相机(ox05bis)+IMU 直连', 'exposure：5×ToF 曝光/板间同步（控制面）', '配件：rc · 圈圈 · insta360 · resource_manager']),
  ],
  [  # rk·运控：mc 对上暴露 ★接口；CPU2/CPU3 隔离核业务显式标注
   ('mc 运动控制', ['★SetMcAction·velocity（指令下发）', '★mc/common/state（全量状态）', 'CPU3 独占：RL·WBC·动作 FSM', 'CPU2：CAN 硬中断 + dm 设备 IO']),
   ('device_manager 设备实时 IO', ['SCHED_RR 钉 CPU2', 'realtime.slice（§2.4）']),
  ],
- [  # orin：任务产出层在上，感知融合居中，传感数据源在下
+ [  # orin：任务产出层在上，感知融合居中（传感直连内容已并入驱动层格）
   ('导航与跟随', ['Nav2 1.1.20（★navi 指令/地图加载）', 'follow_node（★follow/state）', 'trajectory_tracker（环绕运镜）']),
   ('感知与融合', ['percep（分割/深度/检测@TRT）', 'coreon_fusion（27 路融合）', 'person_track+ReID', '（★follow_candidates）', 'brightness · 点云合并']),
-  ('传感接入', ['hal_rgbd 5 目 ToF 数据面（ofilm 直连）', 'hal_camera 2×5MP RGB（x5b 直连）', 'hal_sensor_soc1（ADU/温度）']),
  ],
 ]
 
@@ -109,12 +107,18 @@ os_c2 = [('无 PREEMPT_RT · isolcpus=2,3 隔离', False),
 os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）', False),
          ('systemd · NV 多媒体栈', False),
          ('（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l', False)]
-dr_c1 = [('Mali kbase · RKNPU v0.9.8 · CAN · stmmac', False),
-         ('rkcif+max96724 GMSL · V4L2/USB · I2C/SPI/UART', False),
-         ('MPP/RGA · YT9215RB 交换芯片驱动', False)]
+# 驱动层：传感直连内容在前（以传感为重），底层驱动在后
+dr_c1 = [('hal_sensor：★bms/touch · SetServo · 灯语', False),
+         ('hal_camera：头部相机(ox05bis)+IMU 直连', False),
+         ('exposure：5×ToF 曝光/板间同步（控制面）', False),
+         ('配件：rc · 圈圈 · insta360 · resource_manager', False),
+         ('驱动：Mali kbase · RKNPU v0.9.8 · rkcif', False),
+         ('+max96724 · CAN/stmmac · I2C/SPI/UART · MPP/RGA', False)]
 dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84@CPU2）', False)]
-dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus', False),
-         ('OFILM GMSL：x5b RGB + tof/tofb 5×ToF', False),
+dr_c3 = [('hal_rgbd：5 目 ToF 数据面（ofilm 直连）', False),
+         ('hal_camera：2×5MP RGB（x5b 直连）', False),
+         ('hal_sensor_soc1：ADU/温度', False),
+         ('驱动：nvgpu 540.4.0 · V4L2/NvArgus', False),
          ('NVDEC/NVENC · 千兆以太', False)]
 hw_c1 = [('业务核 = 4×A72 大核 + 2×A53 小核', True),
          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
@@ -253,14 +257,9 @@ t, endy = text_block(px + CELL_PAD + 10, HW_Y + (HW_H - 17 * len(hw_c3)) // 2 + 
 S.append(t)
 assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
 
-# ---------- 工具链纵贯列（开发工具 / 调测工具 / 运维链 / 三方依赖包） ----------
-S.append(box(TC_X, BOARD_Y0, TC_W, HW_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
-t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
-                  color='#7a5c14', center=TC_X + TC_W // 2, maxw=TC_W - 20)
-S.append(t)
+# ---------- 工具链纵贯列（开发/调测/运维/三方依赖包/APP/SDK，紧凑排布） ----------
 GAP = 10
-gy = BOARD_Y0 + 36
-TC_BOT = HW_BOT                       # 工具链框底边与硬件层底对齐（不超出）
+VGAP = 14                                            # 块间紧凑间隙
 
 def group_box(x, y, w, title, lines, stroke='#d8c48a'):
     """内容自适应高度的组框：刚好包住文字（上下各留 8px）"""
@@ -281,28 +280,39 @@ dep_groups = [
  ('UI 与音频', ['flutter-pi + Flutter · Qt 5.15.3', 'PipeWire 1.6.8（PA 兼容 6001/4713）']),
  ('系统与网络服务', ['systemd · NM · hostapd/dnsmasq · mosquitto', 'ptp4l/chrony · can-utils']),
 ]
-# 高度全按内容计算；块间空隙均分铺满列高
-TB = [16 + 16.6 * (1 + len(l)) + 12 for _, l in top_boxes]
-SUB = [16 + 16.6 * (1 + len(l)) + 12 for _, l in dep_groups]
+extra_boxes = [
+ ('◆ APP 应用', ['PrimeBot App：操控/跟随/拍照/看相机', '接入：app_proxy·TRRO+鉴权 · 热点直连']),
+ ('◆ SDK 二次开发包', ['PC SDK：★官方 30 接口（服务/话题/RTSP）', 'FastDDS 直连双板 · aimdk_msgs（§5）']),
+]
+gh = lambda l: 16 + 16.6 * (1 + len(l)) + 12
+TB = [gh(l) for _, l in top_boxes]
+EB = [gh(l) for _, l in extra_boxes]
 DW = 26                                              # 三方依赖包标题带
-wrap_h = DW + sum(SUB) + GAP * (len(dep_groups) - 1) + 10
-vspace = (TC_BOT - 12 - gy) - (sum(TB) + wrap_h)
-vgap = vspace // len(top_boxes)                      # 3 个块间隙（末块后留底部余量）
-assert vgap >= 8, f'工具链列纵向溢出（间隙 {vgap}px）'
+wrap_h = DW + sum(gh(l) for _, l in dep_groups) + GAP * (len(dep_groups) - 1) + 10
+gy0 = BOARD_Y0 + 36
+TC_BOT = gy0 + sum(TB) + wrap_h + sum(EB) + VGAP * (len(TB) + len(EB)) + 16
+assert TC_BOT <= HW_BOT, '工具链列超出硬件层底'
+S.append(box(TC_X, BOARD_Y0, TC_W, TC_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
+t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
+                  color='#7a5c14', center=TC_X + TC_W // 2, maxw=TC_W - 20)
+S.append(t)
+gy = gy0
 for (title, lines), h in zip(top_boxes, TB):
     group_box(TC_X + 8, gy, TC_W - 16, title, lines)
-    gy += h + vgap
+    gy += h + VGAP
 # 「三方依赖包」大框：紧包三组依赖子框
-gy -= vgap                                           # 回退一个间隙，紧贴上一块
 S.append(box(TC_X + 4, gy, TC_W - 8, wrap_h, 'none', '#b08e30', 1.6, rx=8))
 t, _ = text_block(0, gy + 17, [('◆ 三方依赖包', True)], fs=12.5, color='#7a5c14',
                   center=TC_X + TC_W // 2, maxw=TC_W - 20)
 S.append(t)
 sy = gy + DW
-for (title, lines), h in zip(dep_groups, SUB):
-    group_box(TC_X + 12, sy, TC_W - 24, title, lines, stroke='#e0cf96')
-    sy += h + GAP
+for title, lines in dep_groups:
+    sy += group_box(TC_X + 12, sy, TC_W - 24, title, lines, stroke='#e0cf96') + GAP
 assert sy - GAP + 2 <= gy + wrap_h, '三方依赖包纵向溢出'
+gy += wrap_h + VGAP
+for (title, lines), h in zip(extra_boxes, EB):
+    group_box(TC_X + 8, gy, TC_W - 16, title, lines)
+    gy += h + VGAP
 
 # ---------- ①②③通信线（图底部） ----------
 c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
@@ -335,4 +345,4 @@ try:
     cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=2.0)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
-print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 工具链块间隙 {vgap}px')
+print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 工具链底 {TC_BOT:.0f}px')
