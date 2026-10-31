@@ -30,17 +30,26 @@ def box(x, y, w, h, fill, stroke='#5f6b7a', sw=1, rx=6, dash=''):
     d = f' stroke-dasharray="{dash}"' if dash else ''
     return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{d}/>'
 
+def _head(x, y, fx, fy, color='#35495e', size=9):
+    """在 (x,y) 画指向 (从 fx,fy 来向) 的实心三角箭头（不依赖 defs/marker）"""
+    dx, dy = x - fx, y - fy
+    n = (dx * dx + dy * dy) ** 0.5 or 1.0
+    dx, dy = dx / n * size, dy / n * size
+    px, py = -dy * 0.45, dx * 0.45
+    return (f'<polygon points="{x:.0f},{y:.0f} {x - dx + px:.0f},{y - dy + py:.0f} '
+            f'{x - dx - px:.0f},{y - dy - py:.0f}" fill="{color}"/>')
+
 def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
     d = f' stroke-dasharray="{dash}"' if dash else ''
-    m = 'marker-start="url(#ah)" ' if both else ''
-    return (f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="{sw}" '
-            f'{m}marker-end="url(#ah)"{d}/>')
+    out = [f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="{sw}"{d}/>']
+    out.append(_head(x2, y2, x1, y1, color))
+    if both:
+        out.append(_head(x1, y1, x2, y2, color))
+    return ''.join(out)
 
 S = []
 S.append('<?xml version="1.0" encoding="UTF-8"?>')
 S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1110" viewBox="0 0 1560 1110">')
-S.append('<defs><marker id="ah" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">'
-         '<path d="M0,0 L9,4 L0,8 z" fill="#35495e"/></marker></defs>')
 S.append('<rect x="0" y="0" width="1560" height="1110" fill="#ffffff"/>')
 
 # ---------- 版面常量 ----------
