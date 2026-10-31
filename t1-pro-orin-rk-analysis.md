@@ -1343,7 +1343,7 @@ flowchart LR
 
 > 本章依据：① 本文 §1–§6 实机采集结果（**与其他文档冲突时以此为准**）；② SDK《README.md》与《PrimeBot_SDK快速入门与集成指南.md》§1 系统架构总览、§4 板载自启动接入；《接口说明.md》§1 API 列表（★ 官方 30 接口面）。
 > 与官方文档的两处口径差异（均以实测为准）：官方示例节点名 `/hal_audio` 实测为 `/audiomanager_ros2_node`；官方未标注业务大脑（Agent/task_engine）的位置，实测它们部署在**运控板 rk**，「大脑板 orin」承载的是感知与导航算法。
-> **7.3 软件模块接口关系图是 7.1「具身业务层」的模块级展开**：7.1 各列业务层的功能分组在 7.3 中展开为具体软件模块，模块框与 7.1 的分组一一对应（对应关系见 §7.4 表）。
+> **本章三张图递进**：7.1 分层系统架构图（总览）→ 7.2 软件模块连接图（模块与硬件/外部连接视角）→ 7.4 模块接口关系图（7.2 的模块级接口展开）；对应关系见 §7.5 表。
 
 ### 7.1 分层系统架构图（双板纵切 × 五层横切 × 工具链纵贯）
 
@@ -1445,13 +1445,128 @@ flowchart TB
 4. **跨板边界只走结果级数据**：rk↔orin 经内部以太网 FastDDS 域 0 交换目标/点云/代价图与任务指令；相机原图等大带宽在 orin 板内经 iceoryx 消化（§4.0）。
 5. **一套以太网、一个 ROS 2 域**：PC/rk/orin 同处 `10.1.1.0/24`（§1）；rk 是对外网关，**对外接入（App/云/遥控器/圈圈/Insta360）全部终结于运控板**。
 6. **两列同板共享 OS/驱动/硬件**：运控执行列的 OS/驱动/硬件层标注「与左列共享」及该列特有部分（隔离调度、CAN 中断、执行器总线），避免误解为独立系统。
-7. **与 §7.2/§7.3 的对应**：§7.2 模块清单的「功能分组」（交互与业务/系统与运维/传感与外设接入/实时运控/感知与融合/导航与跟随）即本图各列「具身业务层」内的分组；§7.3 为业务层的模块级接口展开。
+7. **与后文四节的对应**：§7.2 软件模块连接图为本图业务层的「模块—硬件—外部」连接视角；§7.3 模块清单的功能分组（交互与业务/系统与运维/传感与外设接入/实时运控/感知与融合/导航与跟随）即本图各列「具身业务层」内的分组；§7.4 为业务层的模块级接口展开；§7.5 为对应与校验。
 
-### 7.2 软件模块清单（与 7.1 图中的框一一对应）
+### 7.2 软件模块连接图（三层四域：模块与硬件、外部的连接视角）
 
-> 进程/节点列全部来自 §3/§4 实测；「代表性接口」可在 §5 全表中展开。★ = SDK 官方对外接口（《接口说明.md》§1）。「7.1 图中位置」列的功能分组（交互与业务/系统与运维/传感与外设接入/实时运控/感知与融合/导航与跟随）对应 7.1 图中各列**具身业务层**内的分组。
+「三层」= 机器人外部的**外部生态域**、双板内部的**业务/算法层**、最底部的**本体硬件域**；「四域」= 外部生态域、运控板域、大脑板域、本体硬件域。本图承接 7.1 总览，聚焦**软件模块与硬件、外部设备之间经何种接口相连**；模块间的业务接口全貌见 §7.4。
 
-| 7.1 图中位置 | 软件模块 | 进程（实测） | ROS 2 节点 | 职责 | 代表性接口 |
+```mermaid
+flowchart TB
+    subgraph EXT["☁ 外部生态域（机器人之外）"]
+        PC["🖥 开发 PC / SDK 用户程序<br/>Ubuntu 22.04 + ROS 2 Humble<br/>有线直连 10.1.1.99"]
+        APP["📱 手机 PrimeBot App<br/>连 rk p2p0 热点 192.168.88.x"]
+        CLOUD["☁ 启元云端<br/>aiem-gw.primebot.cn"]
+        RCDEV["🎮 体感遥控器<br/>蓝牙私有协议"]
+        QJDEV["⭕ 「圈圈」UWB 随行标签<br/>（quanji，板上代号）BLE+UWB 测距测角<br/>IMU+雷达活体检测+麦克风"]
+        I360["📷 Insta360 云台相机<br/>WiFi 接入"]
+    end
+
+    subgraph TOOLS["🧰 三方工具链（纵贯两板的运行时底座 · 版本与开源仓实测见 §6.1）"]
+        direction TB
+        T_MW["📡 中间件与通信<br/>ROS 2 Humble（ros-base 0.10.0）· Fast DDS 2.6.12<br/>rmw-fastrtps 6.2.10 · iceoryx 2.95.4.2<br/>AimRT（开源）+ aimrt_py 1.2.0"]
+        T_AI["🧠 AI 推理运行时<br/>onnxruntime 1.19.2 · RKNN Runtime 2.3.2（rk NPU）<br/>MNN · sherpa-onnx 1.12.15（rk）<br/>TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3（orin）"]
+        T_MM["🎬 多媒体与图像<br/>OpenCV 4.5.4/4.8 · GStreamer 1.22.9（+rockchip 插件）<br/>ffmpeg 4.4.2/6.0 · MPP 1.5.0 · RGA 2.2.0（rk）"]
+        T_UI["🖼 UI 与音频<br/>flutter-pi + Flutter（display_ui）· Qt 5.15.3<br/>PipeWire 1.6.8（PulseAudio 兼容口 6001/4713）"]
+        T_SYS["⚙ 系统与网络服务<br/>systemd（em.service + robot.slice）· NetworkManager<br/>hostapd/dnsmasq · mosquitto 2.0.11 · ptp4l/chrony · can-utils"]
+        T_SDK["🔑 商业 SDK 与语言构建<br/>科大讯飞 VTN/ESR/听写 SDK · omnis_sdk 4.0.0（自研）<br/>Python 3.10 · C++20 · colcon · jetson-stats 7.2.1"]
+    end
+
+    subgraph RK["🖥 运控板 rk3576（soc0 · 10.1.1.100 · 8 核，CPU2/3 隔离）"]
+        direction TB
+        subgraph RK_INT["交互与业务层（用户感知应用 · robot_interaction.slice）"]
+            AGENT["Agent 对话智能体<br/>aima-agent-app · /aimrt_agent_node"]
+            TE["任务引擎 task_engine<br/>/task_engine（长任务编排仲裁）"]
+            DISP["胸屏 display_ui<br/>（flutter-pi，非 ROS）"]
+            AUDIO["音频管理 audio_manager<br/>/audiomanager_ros2_node（PulseAudio TCP 6001/4713）"]
+            LUM["灯效 lumina<br/>（订阅 9 路状态联动灯语，slice=system）"]
+            SCE["场景引擎 scene_engine<br/>（iceoryx，无 ROS 节点，slice=system）"]
+        end
+        subgraph RK_SYS["系统与运维层（robot_system / auxiliary.slice）"]
+            SM["状态机 aim_sm_app · /sm<br/>（系统状态监控：含 hds 健康诊断 · sys_guard 场景看护）"]
+            HK["管家 housekeeper + App 代理 app_proxy<br/>（网络/蓝牙/权限/App 接入鉴权）"]
+            OPS["运维链：cloud_proxy 云端代理 · ota_master<br/>data_exporter 数据导出（auxiliary）· drp 数据录制 · abox 日志"]
+        end
+        subgraph RK_SEN["传感与外设接入层"]
+            HAL0["传感器 HAL soc0<br/>/hal_sensor_soc0（BMS/触摸/灯带/颈部灯/舵机/上下电）"]
+            HALC0["相机 HAL rk 实例<br/>（相机设备规则/曝光，iceoryx 为主）"]
+            HALR0["ToF/RGBD HAL rk 实例<br/>（与 orin 同一交付物按机型配置）"]
+            ODOM["足式里程计 legged_odom<br/>/legged_odom_node（odom/tf · 跟随算法节点@rk）"]
+            ACC["配件接入：rc 遥控器 · connx 圈圈（quanji）<br/>insta360 云台 · rtsp_server · resource_manager 资源/拍照"]
+        end
+        subgraph RK_RT["实时运控层（robot_realtime.slice · 隔离核）"]
+            MC["运动控制 mc_app_main<br/>CPU3 独占 · /mc_ros2_node"]
+            DM["设备管理 device_manager<br/>/device_manager_node（与 mc 同 realtime.slice）"]
+            CANIRQ["CAN0/CAN1 硬中断<br/>CPU2 独占"]
+        end
+        PM0["板基座：process_manager0（em 守护）· sys_guard<br/>iox-roudi（iceoryx 零拷贝）· conduit_router(mosquitto MQTT/TLS)<br/>hostapd/dnsmasq(热点) · tetherd(内网) · secret_store"]
+    end
+
+    subgraph ORIN["🧠 大脑板 Jetson Orin Nano（soc1 · 10.1.1.101 · 6×A78AE + Ampere GPU）"]
+        direction TB
+        subgraph OR_HAL["传感器接入层（manifest 归类：传感器）"]
+            HALR["ToF/RGBD HAL<br/>/hal_rgbd_node（头部 5 目 ToF）"]
+            HALC["相机 HAL<br/>/hal_camera·/hal_camera_1（双目/鱼眼/彩色+头部 IMU）"]
+            HAL1["传感器 HAL soc1<br/>/hal_sensor_soc1（ADU 电源板/温度）"]
+        end
+        subgraph OR_ALGO["感知与融合层（感知独立模块 + 跟随算法节点）"]
+            FUS["多源融合 coreon_fusion<br/>/coreon_fusion_ros2_node（27 路输入）"]
+            PTR["人体跟踪 person_track<br/>+ 亮度检测 brightness_detection"]
+            PRC["感知算法 percep<br/>（分割/室内外/楼梯/语义代价图）"]
+            PCOMB["nav2_perception<br/>（点云合并 + perception_node）"]
+        end
+        subgraph OR_NAV["导航与跟随层（导航算法模块 + 跟随算法节点）"]
+            NAV["Nav2 导航栈（12 节点）<br/>对外封装 /robot_navigation · /map_server"]
+            FLW["跟随控制 follow_node"]
+            TRJ["轨迹跟踪 trajectory_tracker（环绕运镜）"]
+        end
+        PM1["板基座：process_manager1 · sys_guard<br/>iox-roudi · ota_slave · data_exporter"]
+    end
+
+    subgraph HW["⚙ 本体硬件域（机身之内）"]
+        JOINT["14× 关节执行器 + 主控 MCU<br/>挂 CAN0/CAN1 总线"]
+        SENS["本体传感器：BMS · 触摸 · 灯带<br/>舵机 · 躯干 IMU · 5 目 ToF · 相机阵列 · ADU"]
+    end
+
+    %% 工具链（纵贯侧框，按层注入两板）
+    TOOLS -. "三方工具/包/框架按层注入<br/>（中间件/AI 运行时/UI/系统服务）" .-> RK
+    TOOLS -. "同左（TensorRT·CUDA·jetson-stats 侧）" .-> ORIN
+
+    %% 外部 → rk
+    PC <-. "有线直连 10.1.1.0/24<br/>FastDDS · ROS 2 域 0（★官方 30 接口面）" .-> RK
+    APP <-. "p2p0 热点 WiFi" .-> HK
+    CLOUD <-. "WiFi 上联 · MQTT over TLS + 云端 RPC" .-> PM0
+    RCDEV -. "蓝牙" .-> ACC
+    QJDEV -. "BLE + UWB" .-> ACC
+    I360 -. "WiFi" .-> ACC
+
+    %% 双板互联
+    RK <-->|"内部以太网 10.1.1.0/24<br/>FastDDS 域 0 · PTP(ptp4l)+chrony 时钟同步<br/>（相机图/点云/目标↓ · 状态/指令↑）"| ORIN
+
+    %% rk 内部 → 硬件
+    MC -- "关节指令（1kHz 级实时环）" --> CANIRQ -- "CAN 总线" --> JOINT
+    HAL0 -- "I2C/SPI/UART" --> SENS
+
+    %% orin 内部 → 传感器
+    HALR -- "MIPI-CSI/USB" --> SENS
+    HALC -- "MIPI-CSI" --> SENS
+    HAL1 -- "串口" --> SENS
+```
+
+读图要点（与 §1–§3、§6.4 实测对应）：
+
+1. **三方工具链框**：图右侧纵贯框为两板共用的三方底座，六组按职能归类（中间件通信 / AI 推理运行时 / 多媒体图像 / UI 音频 / 系统网络服务 / 商业 SDK 与语言构建），全部版本与开源仓为板载实测（详见 §6.1；构建/调试类工具见 7.1 工具链框）。注意其中 **AI 推理运行时按板分化**：rk 走 onnxruntime+RKNN+MNN+sherpa-onnx（CPU/NPU），orin 走 TensorRT+CUDA（GPU）。
+2. **rk 分层依据 = 启动清单 + cgroup 实证**：层级与成员按 `t1_v2d0_soc0_config.yaml` 的 stages 注释（用户感知应用/系统状态监控/数据导出/数据录制/云端代理/交互应用/跟随算法节点…）与 cgroup slice 归属（`robot_realtime.slice`=mc+device_manager、`robot_interaction.slice`=agent+display_ui+audio_manager+task_engine、`robot_auxiliary.slice`=data_exporter，其余 system）重划，见 §6.4.2/6.4.3。
+3. **rk 是四层三明治**：交互与业务层（用户感知：Agent/任务引擎/胸屏/音频，含灯效与场景引擎）→ 系统与运维层（状态机/管家/云端/OTA/导出/录包/日志）→ 传感与外设接入层（HAL soc0、相机/ToF rk 实例、里程计、配件）→ 实时运控层（隔离核：mc+device_manager@CPU3、CAN 中断@CPU2）。越往下实时性越强；audio_manager/display_ui 按官方 interaction.slice 归入交互层。
+4. **orin 是感知导航算法舱**：分层名与 manifest 注释对齐（传感器 / 感知独立模块+跟随算法节点 / 导航算法模块）。5 目 ToF 与多路相机原始大带宽经板内 iceoryx 消化，仅结果级数据进 DDS 域（§4.0）。
+5. **一套以太网、一个 ROS 2 域**：PC、rk、orin 同处 `10.1.1.0/24`、`ROS_DOMAIN_ID=0` + FastDDS 互通（§4.0）；**rk 是对外网关**（WiFi/热点/RNDIS 在 rk），orin 仅一张内网口（§1.1）。
+6. **所有业务进程由 em/process_manager 统一拉起守护**（`/robot/software/<app>/bin/em_run.sh`，分阶段延时启动，见 §6.4.2）；**对外硬件接口（App/云/遥控器/圈圈/Insta360）全部终结在 rk**。
+
+### 7.3 软件模块清单（与 7.2 图中的框一一对应）
+
+> 进程/节点列全部来自 §3/§4 实测；「代表性接口」可在 §5 全表中展开。★ = SDK 官方对外接口（《接口说明.md》§1）。「7.2 图中位置」列的功能分组（交互与业务/系统与运维/传感与外设接入/实时运控/感知与融合/导航与跟随）对应 7.2 图中的层/域分组（即 7.1 图各列具身业务层内的分组）。
+
+| 7.2 图中位置 | 软件模块 | 进程（实测） | ROS 2 节点 | 职责 | 代表性接口 |
 |---|---|---|---|---|---|
 | 外部·PC | SDK 用户程序 | 开发者自建 | 用户自定义 | 二次开发入口（PC/rk/orin 三处均可部署） | ★30 接口面：`SetMcAction`、`velocity`、`PlayTts`… |
 | 外部·APP | PrimeBot App | 手机端 | — | 遥控/配置/看画面 | 经 app_proxy：`ConnectRobot`、TRRO 透传 |
@@ -1490,9 +1605,9 @@ flowchart TB
 | 硬件域 | 关节执行器/MCU | 14×执行器 @CAN0/1 | —（CAN，不上 DDS） | 关节伺服与本体控制 | 由 MC 经 CPU2 中断收发 |
 | 硬件域 | 本体传感器 | BMS/触摸/灯/舵机/IMU/ToF/相机 | —（经各 HAL 接入） | 机身传感与受控设备 | 由 soc0/soc1 HAL 与 orin HAL 读控 |
 
-### 7.3 软件模块接口关系图（7.1 的模块级展开）
+### 7.4 软件模块接口关系图（7.2 的模块级展开）
 
-> 连线标注 = 实际承载的接口（topic / service 名或总线类型，★ 为 SDK 官方面）；箭头方向 = 数据流或调用方向；双线粗箭头 `==>` 表示二开接入面。模块框与 7.1 的域/层框一一对应。
+> 连线标注 = 实际承载的接口（topic / service 名或总线类型，★ 为 SDK 官方面）；箭头方向 = 数据流或调用方向；双线粗箭头 `==>` 表示二开接入面。模块框与 7.2 的域/层框一一对应。
 
 ```mermaid
 flowchart LR
@@ -1501,7 +1616,7 @@ flowchart LR
     SDK(["🖥 SDK 用户程序<br/>(PC / rk / orin)"])
     CLOUD(["☁ 启元云端"])
 
-    subgraph RK["🖥 运控板 rk（soc0）——对应 7.1 RK 域"]
+    subgraph RK["🖥 运控板 rk（soc0）——对应 7.2 RK 域"]
         direction TB
         subgraph RK_INT["交互与业务层（interaction.slice）"]
             AGENT["Agent<br/>/aimrt_agent_node"]
@@ -1531,7 +1646,7 @@ flowchart LR
         PM0["process_manager0<br/>sys_guard · iox-roudi · conduit_router"]
     end
 
-    subgraph ORIN["🧠 大脑板 orin（soc1）——对应 7.1 ORIN 域"]
+    subgraph ORIN["🧠 大脑板 orin（soc1）——对应 7.2 ORIN 域"]
         direction TB
         subgraph OR_HAL["传感器接入层"]
             HALR["ToF HAL /hal_rgbd_node"]
@@ -1615,11 +1730,11 @@ flowchart LR
 
 > 图中未画出的次级连线（避免过密）：SM 的 `sm/system_state` 广播至全图 8 个订阅者、`robot/trace/events` 埋点汇聚到 cloud_proxy、`permission_state` 对相机/ToF 出流的门控、lumina 灯效订阅 9 路状态做灯语联动等——均见 §4.3 各节点接口挂载明细。
 
-### 7.4 两张图的对应关系与一致性校验
+### 7.5 图间对应关系与一致性校验
 
-**7.1 框 → 7.3 展开 对照表**（7.1 的外部生态与工具链为聚合框，下表按 7.3 的展开粒度对应）：
+**7.2 框 → 7.4 展开 对照表**（7.2 的外部生态与工具链为聚合框，下表按 7.4 的展开粒度对应）：
 
-| 7.1 整体架构图中的框 | 7.3 模块关系图中的展开 | 模块间连接的接口类型 |
+| 7.2 软件模块连接图中的框 | 7.3 模块关系图中的展开 | 模块间连接的接口类型 |
 |---|---|---|
 | 三方工具链框（纵贯侧框） | 六组工具/包/框架（中间件/AI 运行时/多媒体/UI/系统服务/SDK） | 以链接库与运行时形式注入各模块（版本见§6.1） |
 | 外部生态域·手机 App | APP → housekeeper/app_proxy | ROS 2 service（鉴权三件套）+ TRRO 二进制话题 |
@@ -1637,13 +1752,13 @@ flowchart LR
 | orin·板基座 | process_manager1 / sys_guard / iox-roudi / ota_slave | 同 rk 板基座 |
 | 本体硬件域 | 关节执行器框 + 本体传感器框 | CAN 总线（对 DDS 域不可见）/ I2C/SPI/UART/MIPI |
 
-**一致性校验**（对照本文 §3–§5 实测）：
+**一致性校验**（7.4 与 7.2 对照，本文 §3–§5 实测）：
 
-1. **每条连线均有实测依据**：7.3 中模块间的 pub/sub 与 client/service 关系与 §4.3/§4.4 的节点接口挂载一一对应（如 task_engine 的 30 路服务端/51 路客户端、SM 的 28 路 proto 客户端、coreon_fusion 的 27 路订阅）。
-2. **`velocity` 多源汇聚与 7.1 的分层一致**：`/aima/mc/locomotion/velocity` 有 11 个发布者（task_engine/app_proxy/rc/agent 侧/nav2/follow/轨迹跟踪/Insta360…），7.3 中体现为「业务层（interaction）+ 导航规划层（pnc/follow/运镜）+ 配件（rc/insta360）多源 → MC」，MC 按 `SetMcInputSource` 优先级仲裁（§5.1.1）。
-3. **跨板边界与 7.1 的双板框一致**：跨板连线只承载结果级/指令级数据（点云、目标、代价图、`navi/*`、`velocity`）；相机原图等大带宽流量在 orin 板内经 iceoryx 消化，与 §4.0「rk 侧观察不到 orin 全部本地节点」互证。
+1. **每条连线均有实测依据**：7.4 中模块间的 pub/sub 与 client/service 关系与 §4.3/§4.4 的节点接口挂载一一对应（如 task_engine 的 30 路服务端/51 路客户端、SM 的 28 路 proto 客户端、coreon_fusion 的 27 路订阅）。
+2. **`velocity` 多源汇聚与 7.2 的分层一致**：`/aima/mc/locomotion/velocity` 有 11 个发布者（task_engine/app_proxy/rc/agent 侧/nav2/follow/轨迹跟踪/Insta360…），7.4 中体现为「业务层（interaction）+ 导航规划层（pnc/follow/运镜）+ 配件（rc/insta360）多源 → MC」，MC 按 `SetMcInputSource` 优先级仲裁（§5.1.1）。
+3. **跨板边界与 7.2 的双板框一致**：跨板连线只承载结果级/指令级数据（点云、目标、代价图、`navi/*`、`velocity`）；相机原图等大带宽流量在 orin 板内经 iceoryx 消化，与 §4.0「rk 侧观察不到 orin 全部本地节点」互证。
 4. **与官方文档的三处口径差异（已在两图中按实测修正）**：① 业务大脑 Agent/task_engine/SM 在 **rk** 而非 orin（官方《快速入门》§1 仅笼统说运控板含「交互基础服务」）；② 官方示例音频节点名 `/hal_audio` 实测为 `/audiomanager_ros2_node`；③ HAL 按 soc0/soc1 双实例拆分（`hal_sensor_soc0/soc1`、`process_manager0/1`），官方图未体现。
-5. **二开接入位与 7.1 的「一个 ROS 2 域」一致**：SDK 用户程序从 PC 通过 ★接口面直连任一板的任意服务/话题；板载部署时按官方《快速入门》§4 落位 `/robot/software/<your_module>/` 并注册进 process_manager 配置，即成为 7.1 图中 rk/orin 域内的新模块。
+5. **二开接入位与 7.2 的「一个 ROS 2 域」一致**：SDK 用户程序从 PC 通过 ★接口面直连任一板的任意服务/话题；板载部署时按官方《快速入门》§4 落位 `/robot/software/<your_module>/` 并注册进 process_manager 配置，即成为 7.2 图中 rk/orin 域内的新模块。
 6. **模块归类以启动清单为权威依据（2026-10-30 复核）**：rk 分层与成员按 `t1_v2d0_soc0_config.yaml` stages 注释 + cgroup slice（§6.4.2/6.4.3）重划——`audio_manager`/`display_ui` 属 interaction.slice 故从「基础服务层」移入交互层；`mc`+`device_manager` 同属 realtime.slice 故同层；`sm`/`hds` 在 manifest 注释中为「系统状态监控」故移入系统与运维层；`lumina`/`scene_engine` 功能属交互表现但 slice=system（图中已注记）。此前遗漏的 **device_manager、scene_engine、resource_manager、abox、rk 侧 hal_camera/hal_rgbd 实例**已补齐（manifest stages 全部应用与图中框一一核对无缺漏；`aimrt_pulsecore` 部署未启动不入图）。子系统更名对照：业务与交互层→**交互与业务层**、基础服务层→**传感与外设接入层**（原音频/胸屏上移、系统类移出）、感知算法层→**感知与融合层**、导航规划层→**导航与跟随层**（对齐 manifest「跟随算法节点/导航算法模块」语义）。
 
 ---
