@@ -158,7 +158,7 @@ S.append(t)
 
 # ---------- 板框（含部分框四层 + 硬件层） ----------
 def draw_board(bx, bw, title, stroke):
-    S.append(box(bx, BOARD_Y0, bw, BOARD_BOT - BOARD_Y0, '#ffffff', stroke, 5.5, rx=10))
+    S.append(box(bx, BOARD_Y0, bw, BOARD_BOT - BOARD_Y0, '#ffffff', stroke, 4.2, rx=10))
     t, _ = text_block(0, BOARD_Y0 + 19, [(title, True)], fs=13, color='#1c3d5f',
                       center=bx + bw // 2, maxw=bw - 12)   # 板标题框内顶部条带居中
     S.append(t)
