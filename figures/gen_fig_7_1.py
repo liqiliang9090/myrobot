@@ -57,8 +57,8 @@ C3_X, C3_W = 796, 320                 # orin
 TC_X, TC_W = 1140, 400                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
-ROW_H = [530, 78, 78, 70]             # 业务(模块框化)/框架/OS/驱动（部分框内四层）
-HW_H = 88                             # 硬件层（板框内、部分框外）
+ROW_H = [530, 78, 102, 70]            # 业务(模块框化)/框架/OS(含外包框标题带)/驱动（部分框内四层）
+HW_H = 112                            # 硬件层（板框内、部分框外；rk 侧含外包框标题带）
 EXT_Y, EXT_H = 20, 46
 
 PART_Y = BOARD_Y0 + BOARD_TITLE_H                     # 126
@@ -116,7 +116,7 @@ dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84 @CPU2）', False)]
 dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机', False),
          ('（ox05bis/max96724）· NVDEC/NVENC', False),
          ('千兆以太', False)]
-hw_c1 = [('rk3576 SoC：业务核 = 4×A72 大核 + 2×A53 小核', True),
+hw_c1 = [('业务核 = 4×A72 大核 + 2×A53 小核', True),
          ('Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB', False),
          ('eMMC 116.5G · WiFi/BT · YT9215RB+RJ45 · 本体传感器', False)]
 hw_c2 = [('隔离小核 ×2（CPU2/CPU3）', True),
@@ -199,49 +199,96 @@ for ri, (lname, cont) in enumerate(ROWS):
     t, _ = text_block(0, yt + h // 2 + 4, [(lname, True)], fs=13, color='#33414e',
                       center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
     S.append(t)
+    if ri == 1:
+        # OS 层：rk 两列同属一个 Ubuntu 22.04.5 实例 → 外包统一框（落在运控板框内）
+        WH = 24
+        S.append(box(112, yt, 680, h, 'none', '#5b87b5', 1.8, rx=6))
+        t, _ = text_block(0, yt + 16, [('同一 Ubuntu 22.04.5 系统实例', True)], fs=12,
+                          color='#1c3d5f', center=452, maxw=660)
+        S.append(t)
+        for ci in (0, 1):
+            px, pw, *_ = PARTS[ci]
+            ih = h - WH - 4
+            S.append(box(px, yt + WH, pw, ih, FILLS[ri], '#a8b4c0', 1))
+            t, endy = text_block(px + 10, yt + WH + 17, cont[ci], fs=12.2, maxw=pw - 18)
+            S.append(t)
+            assert endy <= yt + WH + ih + 6, f'{lname} 纵向溢出'
+        px, pw, *_ = PARTS[2]
+        S.append(box(px, yt, pw, h, FILLS[ri], '#a8b4c0', 1))
+        t, endy = text_block(px + 10, yt + (h - 17 * len(cont[2])) // 2 + 14,
+                             cont[2], fs=12.2, maxw=pw - 18)
+        S.append(t)
+        assert endy <= yt + h + 6, f'{lname} 纵向溢出'
+        continue
     for ci, (px, pw, *_ ) in enumerate(PARTS):
         S.append(box(px, yt, pw, h, FILLS[ri], '#a8b4c0', 1))
         t, endy = text_block(px + 10, yt + 19, cont[ci], fs=12.2, maxw=pw - 18)
         S.append(t)
         assert endy <= yt + h + 6, f'{lname} 纵向溢出'
 
-# 硬件层（板框内、部分框外）
+# 硬件层（板框内、部分框外）；rk 侧两格外包「rk3576 8 核」统一框（落在运控板框内）
 S.append(box(LBL_X, HW_Y, LBL_W, HW_H, LBL_FILLS[4], '#9aa8b5', 1))
 t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=13, color='#33414e',
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
-for px, pw, cont in ((C1_X, C1_W, hw_c1), (C2_X, C2_W, hw_c2), (C3_X, C3_W, hw_c3)):
-    S.append(box(px, HW_Y, pw, HW_H, HW_FILL, '#a8b4c0', 1))
-    t, endy = text_block(px + 10, HW_Y + 19, cont, fs=12.2, maxw=pw - 18)
+WHW = 24
+S.append(box(112, HW_Y, 680, HW_H, 'none', '#5b87b5', 1.8, rx=6))
+t, _ = text_block(0, HW_Y + 16, [('rk3576 SoC · 8 核 = 4 大核（A72）+ 4 小核（A53）', True)],
+                  fs=12, color='#1c3d5f', center=452, maxw=660)
+S.append(t)
+for px, pw, cont in ((C1_X, C1_W, hw_c1), (C2_X, C2_W, hw_c2)):
+    ih = HW_H - WHW - 4
+    S.append(box(px, HW_Y + WHW, pw, ih, HW_FILL, '#a8b4c0', 1))
+    t, endy = text_block(px + 10, HW_Y + WHW + 17, cont, fs=12.2, maxw=pw - 18)
     S.append(t)
-    assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
+    assert endy <= HW_Y + WHW + ih + 6, '硬件层纵向溢出'
+px, pw = C3_X, C3_W
+S.append(box(px, HW_Y, pw, HW_H, HW_FILL, '#a8b4c0', 1))
+t, endy = text_block(px + 10, HW_Y + (HW_H - 17 * len(hw_c3)) // 2 + 14,
+                     hw_c3, fs=12.2, maxw=pw - 18)
+S.append(t)
+assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
 
-# ---------- 工具链纵贯列 ----------
+# ---------- 工具链纵贯列（开发工具 / 调测工具 / 三方依赖包） ----------
 S.append(box(TC_X, BOARD_Y0, TC_W, BOARD_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
-t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 三方工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
+t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
                   color='#7a5c14', center=TC_X + TC_W // 2, maxw=TC_W - 20)
 S.append(t)
-groups = [
- ('◆ 中间件与通信', ['ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps', 'iceoryx 2.95.4.2 · AimRT + aimrt_py']),
- ('◆ AI 推理运行时', ['onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx', 'TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3']),
- ('◆ 多媒体与图像', ['OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg', 'MPP 1.5.0 · RGA 2.2.0']),
- ('◆ UI 与音频', ['flutter-pi + Flutter · Qt 5.15.3', 'PipeWire 1.6.8（PA 兼容 6001/4713）']),
- ('◆ 系统与网络服务', ['systemd · NM · hostapd/dnsmasq · mosquitto', 'ptp4l/chrony · can-utils']),
- ('◆ 商业 SDK 与语言运行时', ['讯飞 VTN/ESR/听写 · omnis_sdk 4.0.0', 'Python 3.10 · C++20']),
- ('◆ 构建与代码生成', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
- ('◆ 调试与观测', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
-]
+GAP = 10
 gy = BOARD_Y0 + 36
-GAP = 6
-gh = (BOARD_BOT - gy - GAP * (len(groups) - 1)) // len(groups)   # 动态铺满整列
-for title, lines in groups:
-    S.append(box(TC_X + 8, gy, TC_W - 16, gh, '#ffffff', '#d8c48a', 1, rx=5))
+
+def group_box(x, y, w, h, title, lines, stroke='#d8c48a'):
+    S.append(box(x, y, w, h, '#ffffff', stroke, 1, rx=5))
     content_h = 15 + int(16.6 * (1 + len(lines)))
-    ty = gy + max(14, (gh - content_h) // 2 + 15)
-    t, endy = text_block(TC_X + 18, ty, [(title, True)] + [(l, False) for l in lines],
-                         fs=11.8, lh=16.6, maxw=TC_W - 32)
+    ty = y + max(14, (h - content_h) // 2 + 15)
+    t, _ = text_block(x + 10, ty, [(title, True)] + [(l, False) for l in lines],
+                      fs=11.8, lh=16.6, maxw=w - 20)
     S.append(t)
-    gy += gh + GAP
+
+top_boxes = [
+ ('◆ 开发工具', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
+ ('◆ 调测工具', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
+]
+dep_groups = [
+ ('多媒体与图像', ['OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg', 'MPP 1.5.0 · RGA 2.2.0']),
+ ('UI 与音频', ['flutter-pi + Flutter · Qt 5.15.3', 'PipeWire 1.6.8（PA 兼容 6001/4713）']),
+ ('系统与网络服务', ['systemd · NM · hostapd/dnsmasq · mosquitto', 'ptp4l/chrony · can-utils']),
+]
+TB_H = 150
+wrapper_h = (BOARD_BOT - gy) - TB_H * 2 - GAP * 2
+for title, lines in top_boxes:
+    group_box(TC_X + 8, gy, TC_W - 16, TB_H, title, lines)
+    gy += TB_H + GAP
+# 「三方依赖包」大框：把三组依赖包在一起
+S.append(box(TC_X + 4, gy, TC_W - 8, wrapper_h, 'none', '#b08e30', 1.6, rx=8))
+t, _ = text_block(0, gy + 18, [('◆ 三方依赖包', True)], fs=12.5, color='#7a5c14',
+                  center=TC_X + TC_W // 2, maxw=TC_W - 20)
+S.append(t)
+sy = gy + 30
+sub_h = (wrapper_h - 30 - 8 - GAP * (len(dep_groups) - 1)) // len(dep_groups)
+for title, lines in dep_groups:
+    group_box(TC_X + 12, sy, TC_W - 24, sub_h, title, lines, stroke='#e0cf96')
+    sy += sub_h + GAP
 
 # ---------- ①②③通信线（图底部） ----------
 c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
@@ -274,4 +321,4 @@ try:
     cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=2.0)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
-print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 组框高 {gh}px')
+print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 依赖子框高 {sub_h}px')

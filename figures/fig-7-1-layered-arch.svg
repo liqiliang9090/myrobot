@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1204" viewBox="0 0 1560 1204">
-<rect x="0" y="0" width="1560" height="1204" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1252" viewBox="0 0 1560 1252">
+<rect x="0" y="0" width="1560" height="1252" fill="#ffffff"/>
 <rect x="20" y="20" width="1096" height="46" rx="6" fill="#e8f1fb" stroke="#7fa8cc" stroke-width="1.2"/>
 <text x="34" y="49" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板</text>
 <line x1="900" y1="67" x2="900" y2="94" stroke="#35495e" stroke-width="1.2"/><polygon points="900,94 896,85 904,85" fill="#35495e"/>
 <line x1="1000" y1="67" x2="1000" y2="94" stroke="#35495e" stroke-width="1.2"/><polygon points="1000,94 996,85 1004,85" fill="#35495e"/>
 <line x1="1060" y1="67" x2="1060" y2="94" stroke="#35495e" stroke-width="1.2"/><polygon points="1060,94 1056,85 1064,85" fill="#35495e"/>
 <text x="20" y="88" font-family="Noto Sans CJK SC" font-size="10.5" fill="#4a5b6c">[接入] App→app_proxy(TRRO/鉴权) · 云→cloud_proxy(MQTT/TLS) · 遥控器→rc(蓝牙) · 圈圈→connx(BLE+UWB) · Insta360→insta360(WiFi) · PC→★接口面(FastDDS 直连双板)</text>
-<rect x="108" y="96" width="688" height="932" rx="10" fill="#ffffff" stroke="#5b87b5" stroke-width="2"/>
+<rect x="108" y="96" width="688" height="980" rx="10" fill="#ffffff" stroke="#5b87b5" stroke-width="2"/>
 <text x="281" y="116" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">运动板 rk3576（8×ARM + NPU 6TOPS + GPU集成显卡）</text>
-<rect x="788" y="96" width="336" height="932" rx="10" fill="#ffffff" stroke="#8d6fb4" stroke-width="2"/>
+<rect x="788" y="96" width="336" height="980" rx="10" fill="#ffffff" stroke="#8d6fb4" stroke-width="2"/>
 <text x="815" y="116" font-family="Noto Sans CJK SC" font-size="13" fill="#1c3d5f" font-weight="700">大脑板 Orin Nano（6×ARM + Orin 67TOPS）</text>
-<rect x="116" y="126" width="378" height="792" rx="8" fill="#f2f7fc" stroke="#8aa8c4" stroke-width="1.4"/>
+<rect x="116" y="126" width="378" height="816" rx="8" fill="#f2f7fc" stroke="#8aa8c4" stroke-width="1.4"/>
 <text x="251" y="143" font-family="Noto Sans CJK SC" font-size="12" fill="#33414e" font-weight="700">交互业务（非实时）</text>
-<rect x="506" y="126" width="282" height="792" rx="8" fill="#fdf1ea" stroke="#c49a82" stroke-width="1.4"/>
+<rect x="506" y="126" width="282" height="816" rx="8" fill="#fdf1ea" stroke="#c49a82" stroke-width="1.4"/>
 <text x="582" y="143" font-family="Noto Sans CJK SC" font-size="12" fill="#33414e" font-weight="700">运控（实时 | 隔离核）</text>
-<rect x="796" y="126" width="320" height="792" rx="8" fill="#f6f0fb" stroke="#a48ec4" stroke-width="1.4"/>
+<rect x="796" y="126" width="320" height="816" rx="8" fill="#f6f0fb" stroke="#a48ec4" stroke-width="1.4"/>
 <text x="914" y="143" font-family="Noto Sans CJK SC" font-size="12" fill="#33414e" font-weight="700">复杂感知与规划</text>
 <rect x="20" y="150" width="92" height="530" rx="6" fill="#eaf3ff" stroke="#9aa8b5" stroke-width="1"/>
 <text x="34" y="419" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">具身业务层</text>
@@ -91,88 +91,82 @@
 <text x="806" y="703" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">ROS2+Nav2 框架</text>
 <text x="806" y="720" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">TensorRT 10.7 + CUDA 12.6 + cuDNN 9.3</text>
 <text x="806" y="737" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">OpenCV · AimRT · em/process_manager1</text>
-<rect x="20" y="766" width="92" height="78" rx="6" fill="#fdf6e3" stroke="#9aa8b5" stroke-width="1"/>
-<text x="48" y="809" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">OS 层</text>
-<rect x="116" y="766" width="378" height="78" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
-<text x="126" y="785" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Ubuntu 22.04.5（6.1.141）· systemd（em+robot.slice）</text>
-<text x="126" y="802" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">PipeWire · NM/hostapd/dnsmasq · mosquitto</text>
-<text x="126" y="819" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">ptp4l + chrony 时钟同步</text>
-<rect x="506" y="766" width="282" height="78" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
-<text x="516" y="785" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">与左列同板共享内核（无 PREEMPT_RT）</text>
-<text x="516" y="802" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">实时性 = isolcpus=2,3</text>
-<text x="516" y="819" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">+ SCHED_RR 80/85（§2.4）</text>
-<rect x="796" y="766" width="320" height="78" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
-<text x="806" y="785" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Ubuntu + L4T R36.4.4（JetPack 6.2）</text>
-<text x="806" y="802" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">systemd · NV 多媒体栈</text>
-<text x="806" y="819" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l</text>
-<rect x="20" y="848" width="92" height="70" rx="6" fill="#f5eff7" stroke="#9aa8b5" stroke-width="1"/>
-<text x="46" y="887" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">驱动层</text>
-<rect x="116" y="848" width="378" height="70" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
-<text x="126" y="867" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Mali kbase · RKNPU v0.9.8 · CAN · stmmac+YT9215RB</text>
-<text x="126" y="884" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA</text>
-<rect x="506" y="848" width="282" height="70" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
-<text x="516" y="867" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CAN0/1 驱动（硬中断 irq83/84 @CPU2）</text>
-<rect x="796" y="848" width="320" height="70" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
-<text x="806" y="867" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机</text>
-<text x="806" y="884" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">（ox05bis/max96724）· NVDEC/NVENC</text>
-<text x="806" y="901" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">千兆以太</text>
-<rect x="20" y="932" width="92" height="88" rx="6" fill="#fdeee6" stroke="#9aa8b5" stroke-width="1"/>
-<text x="46" y="980" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">硬件层</text>
-<rect x="116" y="932" width="378" height="88" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
-<text x="126" y="951" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">rk3576 SoC：业务核 = 4×A72 大核 + 2×A53 小核</text>
-<text x="126" y="968" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB</text>
-<text x="126" y="985" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">eMMC 116.5G · WiFi/BT · YT9215RB+RJ45 · 本体传感器</text>
-<rect x="506" y="932" width="282" height="88" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
-<text x="516" y="951" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">隔离小核 ×2（CPU2/CPU3）</text>
-<text x="516" y="968" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CPU2：CAN0/1 硬中断 + dm 实时线程</text>
-<text x="516" y="985" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CPU3：MC 运控独占（36 线程）</text>
-<text x="516" y="1002" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CAN0/1 总线 → 14× 关节执行器 + MCU</text>
-<rect x="796" y="932" width="320" height="88" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
-<text x="806" y="951" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Orin（6×A78AE · Ampere 1024CUDA+32TC）</text>
-<text x="806" y="968" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G</text>
-<text x="806" y="985" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">头部相机阵列（双目/鱼眼/彩色/5目ToF）</text>
-<rect x="1140" y="96" width="400" height="932" rx="10" fill="#fffdf4" stroke="#c9a24b" stroke-width="1.2"/>
-<text x="1209" y="118" font-family="Noto Sans CJK SC" font-size="13" fill="#7a5c14" font-weight="700">◆ 三方工具链（纵贯两板 · 版本见 §6.1）</text>
-<rect x="1148" y="132" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="168" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 中间件与通信</text>
-<text x="1158" y="184.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ROS 2 Humble · Fast DDS 2.6.12 · rmw-fastrtps</text>
-<text x="1158" y="201.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">iceoryx 2.95.4.2 · AimRT + aimrt_py</text>
-<rect x="1148" y="244" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="280" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ AI 推理运行时</text>
-<text x="1158" y="296.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">onnxruntime 1.19.2 · RKNN 2.3.2 · MNN · sherpa-onnx</text>
-<text x="1158" y="313.20000000000005" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">TensorRT 10.7 · CUDA 12.6 · cuDNN 9.3</text>
-<rect x="1148" y="356" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="392" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 多媒体与图像</text>
-<text x="1158" y="408.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg</text>
-<text x="1158" y="425.20000000000005" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">MPP 1.5.0 · RGA 2.2.0</text>
-<rect x="1148" y="468" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="504" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ UI 与音频</text>
-<text x="1158" y="520.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">flutter-pi + Flutter · Qt 5.15.3</text>
-<text x="1158" y="537.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">PipeWire 1.6.8（PA 兼容 6001/4713）</text>
-<rect x="1148" y="580" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="616" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 系统与网络服务</text>
-<text x="1158" y="632.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">systemd · NM · hostapd/dnsmasq · mosquitto</text>
-<text x="1158" y="649.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ptp4l/chrony · can-utils</text>
-<rect x="1148" y="692" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="728" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 商业 SDK 与语言运行时</text>
-<text x="1158" y="744.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">讯飞 VTN/ESR/听写 · omnis_sdk 4.0.0</text>
-<text x="1158" y="761.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">Python 3.10 · C++20</text>
-<rect x="1148" y="804" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="840" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 构建与代码生成</text>
-<text x="1158" y="856.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">colcon+CMake 工作空间 · AimRT RPC 代码生成</text>
-<text x="1158" y="873.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">Rust 工具链（orin cargo/rustup）</text>
-<rect x="1148" y="916" width="384" height="106" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="952" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 调试与观测</text>
-<text x="1158" y="968.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ros2 CLI · tegrastats · jetson-stats 7.2.1</text>
-<text x="1158" y="985.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">iox-introspection · ASan · monitor/viz</text>
-<text x="120" y="1052" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑</text>
-<line x1="185" y1="1058" x2="647" y2="1058" stroke="#35495e" stroke-width="1.6"/><polygon points="647,1058 638,1062 638,1054" fill="#35495e"/><polygon points="185,1058 194,1054 194,1062" fill="#35495e"/>
-<text x="120" y="1076" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">② 跨板·任务与感知（FastDDS 域0 · 10.1.1.0/24）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑</text>
-<line x1="305" y1="1082" x2="956" y2="1082" stroke="#35495e" stroke-width="1.6"/><polygon points="956,1082 947,1086 947,1078" fill="#35495e"/><polygon points="305,1082 314,1078 314,1086" fill="#35495e"/>
-<text x="687" y="1100" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">③ 跨板·速度直连：orin velocity(pnc/follow/运镜)→MC（SetMcInputSource 仲裁）</text>
-<line x1="956" y1="1106" x2="647" y2="1106" stroke="#35495e" stroke-width="1.6"/><polygon points="647,1106 656,1102 656,1110" fill="#35495e"/>
-<line x1="1140" y1="1082" x2="1116" y2="1082" stroke="#35495e" stroke-width="1.3" stroke-dasharray="5,4"/><polygon points="1116,1082 1125,1078 1125,1086" fill="#35495e"/><polygon points="1140,1082 1131,1086 1131,1078" fill="#35495e"/>
-<text x="20" y="1138" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。</text>
-<text x="20" y="1154.6" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">业务层模块框序：自上而下＝依赖方向（上＝对外接口/依赖方，下＝被依赖底座与数据源）。</text>
-<text x="20" y="1171.1999999999998" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。</text>
+<rect x="20" y="766" width="92" height="102" rx="6" fill="#fdf6e3" stroke="#9aa8b5" stroke-width="1"/>
+<text x="48" y="821" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">OS 层</text>
+<rect x="112" y="766" width="680" height="102" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>
+<text x="360" y="782" font-family="Noto Sans CJK SC" font-size="12" fill="#1c3d5f" font-weight="700">同一 Ubuntu 22.04.5 系统实例</text>
+<rect x="116" y="790" width="378" height="74" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="807" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Ubuntu 22.04.5（6.1.141）· systemd（em+robot.slice）</text>
+<text x="126" y="824" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">PipeWire · NM/hostapd/dnsmasq · mosquitto</text>
+<text x="126" y="841" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">ptp4l + chrony 时钟同步</text>
+<rect x="506" y="790" width="282" height="74" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="807" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">与左列同板共享内核（无 PREEMPT_RT）</text>
+<text x="516" y="824" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">实时性 = isolcpus=2,3</text>
+<text x="516" y="841" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">+ SCHED_RR 80/85（§2.4）</text>
+<rect x="796" y="766" width="320" height="102" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="805" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Ubuntu + L4T R36.4.4（JetPack 6.2）</text>
+<text x="806" y="822" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">systemd · NV 多媒体栈</text>
+<text x="806" y="839" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l</text>
+<rect x="20" y="872" width="92" height="70" rx="6" fill="#f5eff7" stroke="#9aa8b5" stroke-width="1"/>
+<text x="46" y="911" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">驱动层</text>
+<rect x="116" y="872" width="378" height="70" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="891" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Mali kbase · RKNPU v0.9.8 · CAN · stmmac+YT9215RB</text>
+<text x="126" y="908" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA</text>
+<rect x="506" y="872" width="282" height="70" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="891" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CAN0/1 驱动（硬中断 irq83/84 @CPU2）</text>
+<rect x="796" y="872" width="320" height="70" rx="6" fill="#faf6fb" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="891" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机</text>
+<text x="806" y="908" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">（ox05bis/max96724）· NVDEC/NVENC</text>
+<text x="806" y="925" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">千兆以太</text>
+<rect x="20" y="956" width="92" height="112" rx="6" fill="#fdeee6" stroke="#9aa8b5" stroke-width="1"/>
+<text x="46" y="1016" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">硬件层</text>
+<rect x="112" y="956" width="680" height="112" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>
+<text x="293" y="972" font-family="Noto Sans CJK SC" font-size="12" fill="#1c3d5f" font-weight="700">rk3576 SoC · 8 核 = 4 大核（A72）+ 4 小核（A53）</text>
+<rect x="116" y="980" width="378" height="84" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
+<text x="126" y="997" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">业务核 = 4×A72 大核 + 2×A53 小核</text>
+<text x="126" y="1014" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Mali-G52 图形 GPU · NPU 6TOPS · 统一 DDR 8GB</text>
+<text x="126" y="1031" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">eMMC 116.5G · WiFi/BT · YT9215RB+RJ45 · 本体传感器</text>
+<rect x="506" y="980" width="282" height="84" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
+<text x="516" y="997" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">隔离小核 ×2（CPU2/CPU3）</text>
+<text x="516" y="1014" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CPU2：CAN0/1 硬中断 + dm 实时线程</text>
+<text x="516" y="1031" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CPU3：MC 运控独占（36 线程）</text>
+<text x="516" y="1048" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">CAN0/1 总线 → 14× 关节执行器 + MCU</text>
+<rect x="796" y="956" width="320" height="112" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
+<text x="806" y="1000" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Orin（6×A78AE · Ampere 1024CUDA+32TC）</text>
+<text x="806" y="1017" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G</text>
+<text x="806" y="1034" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">头部相机阵列（双目/鱼眼/彩色/5目ToF）</text>
+<rect x="1140" y="96" width="400" height="980" rx="10" fill="#fffdf4" stroke="#c9a24b" stroke-width="1.2"/>
+<text x="1222" y="118" font-family="Noto Sans CJK SC" font-size="13" fill="#7a5c14" font-weight="700">◆ 工具链（纵贯两板 · 版本见 §6.1）</text>
+<rect x="1148" y="132" width="384" height="150" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
+<text x="1158" y="190" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 开发工具</text>
+<text x="1158" y="206.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">colcon+CMake 工作空间 · AimRT RPC 代码生成</text>
+<text x="1158" y="223.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">Rust 工具链（orin cargo/rustup）</text>
+<rect x="1148" y="292" width="384" height="150" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
+<text x="1158" y="350" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 调测工具</text>
+<text x="1158" y="366.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ros2 CLI · tegrastats · jetson-stats 7.2.1</text>
+<text x="1158" y="383.20000000000005" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">iox-introspection · ASan · monitor/viz</text>
+<rect x="1144" y="452" width="392" height="624" rx="8" fill="none" stroke="#b08e30" stroke-width="1.6"/>
+<text x="1301" y="470" font-family="Noto Sans CJK SC" font-size="12.5" fill="#7a5c14" font-weight="700">◆ 三方依赖包</text>
+<rect x="1152" y="482" width="376" height="188" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
+<text x="1162" y="559" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">多媒体与图像</text>
+<text x="1162" y="575.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg</text>
+<text x="1162" y="592.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">MPP 1.5.0 · RGA 2.2.0</text>
+<rect x="1152" y="680" width="376" height="188" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
+<text x="1162" y="757" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">UI 与音频</text>
+<text x="1162" y="773.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">flutter-pi + Flutter · Qt 5.15.3</text>
+<text x="1162" y="790.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">PipeWire 1.6.8（PA 兼容 6001/4713）</text>
+<rect x="1152" y="878" width="376" height="188" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
+<text x="1162" y="955" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">系统与网络服务</text>
+<text x="1162" y="971.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">systemd · NM · hostapd/dnsmasq · mosquitto</text>
+<text x="1162" y="988.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ptp4l/chrony · can-utils</text>
+<text x="120" y="1100" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑</text>
+<line x1="185" y1="1106" x2="647" y2="1106" stroke="#35495e" stroke-width="1.6"/><polygon points="647,1106 638,1110 638,1102" fill="#35495e"/><polygon points="185,1106 194,1102 194,1110" fill="#35495e"/>
+<text x="120" y="1124" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">② 跨板·任务与感知（FastDDS 域0 · 10.1.1.0/24）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑</text>
+<line x1="305" y1="1130" x2="956" y2="1130" stroke="#35495e" stroke-width="1.6"/><polygon points="956,1130 947,1134 947,1126" fill="#35495e"/><polygon points="305,1130 314,1126 314,1134" fill="#35495e"/>
+<text x="687" y="1148" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">③ 跨板·速度直连：orin velocity(pnc/follow/运镜)→MC（SetMcInputSource 仲裁）</text>
+<line x1="956" y1="1154" x2="647" y2="1154" stroke="#35495e" stroke-width="1.6"/><polygon points="647,1154 656,1150 656,1158" fill="#35495e"/>
+<line x1="1140" y1="1130" x2="1116" y2="1130" stroke="#35495e" stroke-width="1.3" stroke-dasharray="5,4"/><polygon points="1116,1130 1125,1126 1125,1134" fill="#35495e"/><polygon points="1140,1130 1131,1134 1131,1126" fill="#35495e"/>
+<text x="20" y="1186" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。</text>
+<text x="20" y="1202.6" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">业务层模块框序：自上而下＝依赖方向（上＝对外接口/依赖方，下＝被依赖底座与数据源）。</text>
+<text x="20" y="1219.1999999999998" font-family="Noto Sans CJK SC" font-size="11.2" fill="#5b6b7a">列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。</text>
 </svg>
