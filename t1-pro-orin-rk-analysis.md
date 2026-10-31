@@ -973,6 +973,8 @@ AimRT 的 protobuf RPC 经 ROS 2 桥暴露，**服务名是转义后的 proto �
 
 #### 6.2.1 UC1 对话「请跳个舞」全链路
 
+**流程图 UC1「请跳个舞」——模块链路拓扑：语音 → Agent/云端 → task_engine → MC（按域分组，静态链路视角）**
+
 ```mermaid
 flowchart LR
     USER(["👤 用户语音<br/>「请跳个舞」"])
@@ -1072,6 +1074,8 @@ sequenceDiagram
 
 #### 6.2.2 UC2 姿态切换「趴下 → 四足站立」
 
+**流程图 UC2「趴下 → 四足站立」——模块链路拓扑：Agent → task_engine（规则门控）→ MC → CAN → 关节（静态链路视角）**
+
 ```mermaid
 flowchart LR
     USER(["👤 语音「趴下」/「站起来」<br/>(或 App · 遥控器)"])
@@ -1131,6 +1135,8 @@ sequenceDiagram
 3. 姿态切换全链路在 rk 板内闭环（不涉 orin），语义段走云端。
 
 #### 6.2.3 UC3「牵着 T1 的手一起走」（跟随）
+
+**流程图 UC3「牵着 T1 的手一起走」——双路径链路拓扑：视觉跟随路径（本例未生效，虚线）+ 牵手带步路径（实际生效，实线）**
 
 ```mermaid
 flowchart LR
