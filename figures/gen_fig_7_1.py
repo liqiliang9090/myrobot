@@ -50,11 +50,11 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
 S = []   # 图体元素（svg 开闭标签在末尾按实际画布高拼装）
 
 # ---------- 版面常量 ----------
-LBL_X, LBL_W = 20, 92
+LBL_X, LBL_W = 20, 84
 C1_X, C1_W = 116, 378                 # rk·交互业务
 C2_X, C2_W = 506, 282                 # rk·运控
-C3_X, C3_W = 796, 320                 # orin
-TC_X, TC_W = 1140, 400                # 工具链（纵贯）
+C3_X, C3_W = 810, 320                 # orin（右移 14：与运控板框留 6px 间隙）
+TC_X, TC_W = 1146, 394                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
 ROW_H = [310, 78, 102, 126]           # 业务(模块框化)/框架/OS(含外包框标题带)/驱动(含传感直连内容)（部分框内四层）
@@ -139,14 +139,19 @@ FILLS = ['#f6faf2', '#fefaf0', '#faf6fb']
 HW_FILL = '#fef6f1'
 LBL_FILLS = ['#eaf3ff', '#f0f7ea', '#fdf6e3', '#f5eff7', '#fdeee6']
 
-# ---------- 外部生态带 + 接入行 ----------
+# ---------- 启元云端大模型带 + 接入行 ----------
 S.append(box(LBL_X, EXT_Y, (C3_X + C3_W) - LBL_X, EXT_H, '#e8f1fb', '#7fa8cc', 1.2))
 t, _ = text_block(LBL_X + 14, EXT_Y + 29,
-                  [('外部生态：开发 PC（★接口面可直连双板）· PrimeBot App · 启元云端 · 体感遥控器 ·「圈圈」UWB 标签 · Insta360 —— 对外接入全部终结于运控板', True)],
+                  [('启元云端大模型：LLM 对话与语义理解 · 意图/任务生成 · 知识问答 —— 由运控板 Agent 发起调用', True)],
                   fs=13, color='#1c3d5f', maxw=(C3_X + C3_W) - LBL_X - 28)
 S.append(t)
-for ax in (900, 1000, 1060):
-    S.append(arrow(ax, EXT_Y + EXT_H + 1, ax, BOARD_Y0 - 2, both=False, sw=1.2))
+# 云端连接（实测 2026-10-31）：仅运控板有云链路；大脑板无直连
+S.append(arrow(450, EXT_Y + EXT_H + 1, 450, BOARD_Y0 - 2, both=True, sw=1.2))
+t, _ = text_block(462, 79, [('HTTPS/TLS 443 · aiem-gw.agibot.com /v1/session：LLM 对话/意图（Agent）；MQTT/TLS：状态/OTA（cloud_proxy）', False)],
+                  fs=10, color='#1c3d5f')
+S.append(t)
+t, _ = text_block(960, 79, [('（大脑板无云端直连，云流量均经运控板）', False)], fs=10, color='#6b7a89')
+S.append(t)
 t, _ = text_block(LBL_X, 88, [('[接入] App→app_proxy(TRRO/鉴权) · 云→cloud_proxy(MQTT/TLS) · 遥控器→rc(蓝牙) · 圈圈→connx(BLE+UWB) · Insta360→insta360(WiFi) · PC→★接口面(FastDDS 直连双板)', False)],
                   fs=10.5, color='#4a5b6c')
 S.append(t)
@@ -290,8 +295,8 @@ EB = [gh(l) for _, l in extra_boxes]
 DW = 26                                              # 三方依赖包标题带
 wrap_h = DW + sum(gh(l) for _, l in dep_groups) + GAP * (len(dep_groups) - 1) + 10
 gy0 = BOARD_Y0 + 36
-TC_BOT = gy0 + sum(TB) + wrap_h + sum(EB) + VGAP * (len(TB) + len(EB)) + 16
-assert TC_BOT <= HW_BOT, '工具链列超出硬件层底'
+TC_BOT = HW_BOT                       # 工具链框底与硬件层底对齐
+assert gy0 + sum(TB) + wrap_h + sum(EB) + VGAP * (len(TB) + len(EB)) + 8 <= TC_BOT, '工具链列纵向溢出'
 S.append(box(TC_X, BOARD_Y0, TC_W, TC_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
 t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
                   color='#7a5c14', center=TC_X + TC_W // 2, maxw=TC_W - 20)
