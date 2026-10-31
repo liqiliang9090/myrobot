@@ -222,13 +222,16 @@ groups = [
  ('◆ 调试与观测', ['ros2 CLI · tegrastats · jetson-stats 7.2.1', 'iox-introspection · ASan · monitor/viz']),
 ]
 gy = BOARD_Y0 + 36
-gh = 64
+GAP = 6
+gh = (BOARD_BOT - gy - GAP * (len(groups) - 1)) // len(groups)   # 动态铺满整列
 for title, lines in groups:
     S.append(box(TC_X + 8, gy, TC_W - 16, gh, '#ffffff', '#d8c48a', 1, rx=5))
-    t, endy = text_block(TC_X + 18, gy + 17, [(title, True)] + [(l, False) for l in lines],
-                         fs=11.4, maxw=TC_W - 36)
+    content_h = 15 + int(16.2 * (1 + len(lines)))
+    ty = gy + max(14, (gh - content_h) // 2 + 15)
+    t, endy = text_block(TC_X + 18, ty, [(title, True)] + [(l, False) for l in lines],
+                         fs=11.4, lh=16, maxw=TC_W - 36)
     S.append(t)
-    gy += gh + 5
+    gy += gh + GAP
 
 # ---------- ①②③通信线（图底部） ----------
 c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
@@ -257,4 +260,4 @@ try:
     cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=1.5)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
-print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 板底 {BOARD_BOT}px, 画布 930px)')
+print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 板底 {BOARD_BOT}px, 组框高 {gh}px')
