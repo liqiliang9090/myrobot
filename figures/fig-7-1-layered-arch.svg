@@ -74,7 +74,7 @@
 <text x="832" y="519" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">OpenCV · AimRT · em/process_manager1</text>
 <rect x="20" y="548" width="84" height="102" rx="6" fill="#fdf6e3" stroke="#9aa8b5" stroke-width="1"/>
 <text x="44" y="603" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">OS 层</text>
-<rect x="118" y="548" width="668" height="102" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>
+<rect x="124" y="548" width="656" height="102" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>
 <text x="404" y="564" font-family="Noto Sans CJK SC" font-size="12" fill="#1c3d5f" font-weight="700">Ubuntu 22.04.5</text>
 <rect x="128" y="572" width="354" height="74" rx="6" fill="#fefaf0" stroke="#a8b4c0" stroke-width="1"/>
 <text x="138" y="589" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">systemd（em+robot.slice）· interaction.slice</text>
@@ -108,7 +108,7 @@
 <text x="832" y="758" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">驱动：nvgpu · NvArgus · NVDEC · 千兆以太</text>
 <rect x="20" y="806" width="84" height="112" rx="6" fill="#fdeee6" stroke="#9aa8b5" stroke-width="1"/>
 <text x="42" y="866" font-family="Noto Sans CJK SC" font-size="13" fill="#33414e" font-weight="700">硬件层</text>
-<rect x="118" y="806" width="668" height="112" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>
+<rect x="124" y="806" width="656" height="112" rx="6" fill="none" stroke="#5b87b5" stroke-width="1.8"/>
 <text x="293" y="822" font-family="Noto Sans CJK SC" font-size="12" fill="#1c3d5f" font-weight="700">rk3576 SoC · 8 核 = 4 大核（A72）+ 4 小核（A53）</text>
 <rect x="128" y="830" width="354" height="84" rx="6" fill="#fef6f1" stroke="#a8b4c0" stroke-width="1"/>
 <text x="138" y="847" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933" font-weight="700">业务核 = 4×A72 大核 + 2×A53 小核</text>

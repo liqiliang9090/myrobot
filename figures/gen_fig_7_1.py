@@ -213,7 +213,7 @@ for ri, (lname, cont) in enumerate(ROWS):
     if ri == 1:
         # OS 层：rk 两列同属一个 Ubuntu 22.04.5 实例 → 外包统一框（落在运控板框内）
         WH = 24
-        S.append(box(118, yt, 668, h, 'none', '#5b87b5', 1.8, rx=6))
+        S.append(box(124, yt, 656, h, 'none', '#5b87b5', 1.8, rx=6))
         t, _ = text_block(0, yt + 16, [('Ubuntu 22.04.5', True)], fs=12,
                           color='#1c3d5f', center=452, maxw=660)
         S.append(t)
@@ -245,7 +245,7 @@ t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=13, color='
                   center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 WHW = 24
-S.append(box(118, HW_Y, 668, HW_H, 'none', '#5b87b5', 1.8, rx=6))
+S.append(box(124, HW_Y, 656, HW_H, 'none', '#5b87b5', 1.8, rx=6))
 t, _ = text_block(0, HW_Y + 16, [('rk3576 SoC · 8 核 = 4 大核（A72）+ 4 小核（A53）', True)],
                   fs=12, color='#1c3d5f', center=452, maxw=660)
 S.append(t)
