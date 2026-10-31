@@ -1014,7 +1014,9 @@ flowchart LR
     TE -.->|"interaction/state ★ 任务状态"| LUM
 ```
 
-**时序图（纵向=时间；实线=请求，虚线=返回；每条消息标注接口类型：Service=ROS2 服务 / Topic=单向广播 / FuncCall=板内函数调用）**：
+**时序图 UC1「请跳个舞」——语音 → 云端意图（实测 ~62s）→ 任务仲裁 → 起身+四足跳舞（18s）→ 多模态反馈**
+
+> 读法（纵向=时间；实线=请求、虚线=返回；Service=ROS 2 服务 / Topic=单向广播 / FuncCall=板内函数调用）。
 
 ```mermaid
 sequenceDiagram
@@ -1086,39 +1088,9 @@ flowchart LR
     TE -.->|"完成播报 PlayTts"| USER
 ```
 
-门控与要点（实测规则 + 事件流）：
-1. **任务规则前置检查**（`rule/t1/posture.yaml`）：`allow_held_state: false`（**牵手状态下拒绝姿态切换**）；`posture_exemptions "4":[battery, charging]`（趴下动画豁免低电/充电态——趴下充电场景）；任意姿态可触发、可被 move/posture/upper_body 抢占。
-2. **实测节奏**：双足→趴稳 5s（21→102→110）；趴→四足站立 5s（115→101→102）；动作完成以 `mc/common/state.action_info` 状态回报 TE 闭环。
-3. 姿态切换全链路在 rk 板内闭环（不涉 orin），语义段走云端。
+**时序图 UC2「趴下 → 四足站立」——规则门控（牵手/电量）→ ★SetMcAction → RL 姿态控制环 → 完成播报**
 
-#### 6.2.3 UC3「牵着 T1 的手一起走」（跟随）
-
-```mermaid
-flowchart LR
-    USER(["👤 用户: 语音「跟着我」<br/>+ 牵手带步"])
-    subgraph RK["🖥 运控板 rk"]
-        AGENT["Agent 意图"]
-        TE["task_engine<br/>规则: follow.yaml (pri 50)<br/>电量≥6% · odom 可信"]
-        MC["MC /mc_ros2_node (CPU3)<br/>双足 WBC + 力导引牵行步态"]
-        CAN["CAN @CPU2 → 关节"]
-    end
-    subgraph ORIN["🧠 大脑板 orin"]
-        PTR["person_track<br/>yolov8s-seg + clip_reid/swin ReID<br/>(TensorRT @GPU)"]
-        FLW["follow_node 语义跟随规划<br/>(decoupled-PID+零相位低通)"]
-    end
-    USER --> AGENT -- "semantic_intent" --> TE
-    TE ==>|"FollowTaskCtrl(type=1 跟随)"| X1{"任务分发"}
-    X1 ==>|"set_follow_perception_task(启搜)"| PTR
-    X1 ==>|"SetFollowTaskBiped"| FLW
-    PTR -.->|"follow_candidates ★ (本例未锁定目标<br/>follow/state=1 未发现)"| TE
-    FLW -.->|"velocity(source=follow)→MC<br/>(视觉跟随路径·本例未生效)"| MC
-    USER == "牵手（关节力矩感知）" ==> MC
-    MC ==>|"held_state: McHandHeldState<br/>(LEFT/RIGHT_HELD · is_held)"| TE
-    MC -- "WBC 牵行关节指令" --> CAN
-    MC ==>|"★ mc/common/state(held_state/is_moving)"| TE
-```
-
-**时序图（接口/返回值明细）**：
+> 读法同 UC1 时序图。
 
 ```mermaid
 sequenceDiagram
@@ -1153,7 +1125,41 @@ sequenceDiagram
     AG-->>TE: PlayTtsResponse{trace_id}
 ```
 
-**时序图（接口/返回值明细）**：
+门控与要点（实测规则 + 事件流）：
+1. **任务规则前置检查**（`rule/t1/posture.yaml`）：`allow_held_state: false`（**牵手状态下拒绝姿态切换**）；`posture_exemptions "4":[battery, charging]`（趴下动画豁免低电/充电态——趴下充电场景）；任意姿态可触发、可被 move/posture/upper_body 抢占。
+2. **实测节奏**：双足→趴稳 5s（21→102→110）；趴→四足站立 5s（115→101→102）；动作完成以 `mc/common/state.action_info` 状态回报 TE 闭环。
+3. 姿态切换全链路在 rk 板内闭环（不涉 orin），语义段走云端。
+
+#### 6.2.3 UC3「牵着 T1 的手一起走」（跟随）
+
+```mermaid
+flowchart LR
+    USER(["👤 用户: 语音「跟着我」<br/>+ 牵手带步"])
+    subgraph RK["🖥 运控板 rk"]
+        AGENT["Agent 意图"]
+        TE["task_engine<br/>规则: follow.yaml (pri 50)<br/>电量≥6% · odom 可信"]
+        MC["MC /mc_ros2_node (CPU3)<br/>双足 WBC + 力导引牵行步态"]
+        CAN["CAN @CPU2 → 关节"]
+    end
+    subgraph ORIN["🧠 大脑板 orin"]
+        PTR["person_track<br/>yolov8s-seg + clip_reid/swin ReID<br/>(TensorRT @GPU)"]
+        FLW["follow_node 语义跟随规划<br/>(decoupled-PID+零相位低通)"]
+    end
+    USER --> AGENT -- "semantic_intent" --> TE
+    TE ==>|"FollowTaskCtrl(type=1 跟随)"| X1{"任务分发"}
+    X1 ==>|"set_follow_perception_task(启搜)"| PTR
+    X1 ==>|"SetFollowTaskBiped"| FLW
+    PTR -.->|"follow_candidates ★ (本例未锁定目标<br/>follow/state=1 未发现)"| TE
+    FLW -.->|"velocity(source=follow)→MC<br/>(视觉跟随路径·本例未生效)"| MC
+    USER == "牵手（关节力矩感知）" ==> MC
+    MC ==>|"held_state: McHandHeldState<br/>(LEFT/RIGHT_HELD · is_held)"| TE
+    MC -- "WBC 牵行关节指令" --> CAN
+    MC ==>|"★ mc/common/state(held_state/is_moving)"| TE
+```
+
+**时序图 UC3「牵着 T1 的手一起走」——跟随任务启停（视觉未锁定）→ 牵手 held_state 检测 → 双足 WBC 力导引带步**
+
+> 读法同 UC1 时序图。
 
 ```mermaid
 sequenceDiagram

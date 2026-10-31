@@ -244,7 +244,7 @@ out = '\n'.join(S)
 open('figures/fig-7-1-layered-arch.svg', 'w', encoding='utf-8').write(out)
 try:
     import cairosvg
-    cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=2)
+    cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=1.5)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
 if OVERFLOW:
