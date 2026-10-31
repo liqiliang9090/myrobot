@@ -128,34 +128,34 @@
 <text x="812" y="898" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">Orin（6×A78AE · Ampere 1024CUDA+32TC）</text>
 <text x="812" y="915" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">统一 LPDDR5 8GB · 102.4GB/s · NVMe 238.5G</text>
 <text x="812" y="932" font-family="Noto Sans CJK SC" font-size="12.2" fill="#1f2933">OFILM GMSL 模组：2×5MP RGB + 5 目 ToF</text>
-<rect x="1140" y="96" width="400" height="878" rx="10" fill="#fffdf4" stroke="#c9a24b" stroke-width="1.2"/>
+<rect x="1140" y="96" width="400" height="870" rx="10" fill="#fffdf4" stroke="#c9a24b" stroke-width="1.2"/>
 <text x="1222" y="118" font-family="Noto Sans CJK SC" font-size="13" fill="#7a5c14" font-weight="700">◆ 工具链（纵贯两板 · 版本见 §6.1）</text>
-<rect x="1148" y="132" width="384" height="150" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="190" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 开发工具</text>
-<text x="1158" y="206.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">colcon+CMake 工作空间 · AimRT RPC 代码生成</text>
-<text x="1158" y="223.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">Rust 工具链（orin cargo/rustup）</text>
-<rect x="1148" y="292" width="384" height="150" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="350" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 调测工具</text>
-<text x="1158" y="366.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ros2 CLI · tegrastats · jetson-stats 7.2.1</text>
-<text x="1158" y="383.20000000000005" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">iox-introspection · ASan · monitor/viz</text>
-<rect x="1148" y="452" width="384" height="150" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
-<text x="1158" y="510" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 运维链</text>
-<text x="1158" y="526.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">hds · cloud_proxy · ota · data_exporter</text>
-<text x="1158" y="543.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">drp · abox</text>
-<rect x="1144" y="612" width="392" height="522" rx="8" fill="none" stroke="#b08e30" stroke-width="1.6"/>
-<text x="1301" y="630" font-family="Noto Sans CJK SC" font-size="12.5" fill="#7a5c14" font-weight="700">◆ 三方依赖包</text>
-<rect x="1152" y="642" width="376" height="154" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
-<text x="1162" y="702" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">多媒体与图像</text>
-<text x="1162" y="718.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg</text>
-<text x="1162" y="735.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">MPP 1.5.0 · RGA 2.2.0</text>
-<rect x="1152" y="806" width="376" height="154" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
-<text x="1162" y="866" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">UI 与音频</text>
-<text x="1162" y="882.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">flutter-pi + Flutter · Qt 5.15.3</text>
-<text x="1162" y="899.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">PipeWire 1.6.8（PA 兼容 6001/4713）</text>
-<rect x="1152" y="970" width="376" height="154" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
-<text x="1162" y="1030" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">系统与网络服务</text>
-<text x="1162" y="1046.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">systemd · NM · hostapd/dnsmasq · mosquitto</text>
-<text x="1162" y="1063.1999999999998" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ptp4l/chrony · can-utils</text>
+<rect x="1148" y="132" width="384" height="77.80000000000001" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
+<text x="1158" y="149" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 开发工具</text>
+<text x="1158" y="165.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">colcon+CMake 工作空间 · AimRT RPC 代码生成</text>
+<text x="1158" y="182.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">Rust 工具链（orin cargo/rustup）</text>
+<rect x="1148" y="308.8" width="384" height="77.80000000000001" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
+<text x="1158" y="325.8" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 调测工具</text>
+<text x="1158" y="342.40000000000003" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ros2 CLI · tegrastats · jetson-stats 7.2.1</text>
+<text x="1158" y="359.00000000000006" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">iox-introspection · ASan · monitor/viz</text>
+<rect x="1148" y="485.6" width="384" height="77.80000000000001" rx="5" fill="#ffffff" stroke="#d8c48a" stroke-width="1"/>
+<text x="1158" y="502.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">◆ 运维链</text>
+<text x="1158" y="519.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">hds · cloud_proxy · ota · data_exporter</text>
+<text x="1158" y="535.8000000000001" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">drp · abox</text>
+<rect x="1144" y="563.4000000000001" width="392" height="289.40000000000003" rx="8" fill="none" stroke="#b08e30" stroke-width="1.6"/>
+<text x="1301" y="580.4000000000001" font-family="Noto Sans CJK SC" font-size="12.5" fill="#7a5c14" font-weight="700">◆ 三方依赖包</text>
+<rect x="1152" y="589.4000000000001" width="376" height="77.80000000000001" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
+<text x="1162" y="606.4000000000001" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">多媒体与图像</text>
+<text x="1162" y="623.0000000000001" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">OpenCV 4.5.4/4.8 · GStreamer+rockchip · ffmpeg</text>
+<text x="1162" y="639.6000000000001" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">MPP 1.5.0 · RGA 2.2.0</text>
+<rect x="1152" y="677.2" width="376" height="77.80000000000001" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
+<text x="1162" y="694.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">UI 与音频</text>
+<text x="1162" y="710.8000000000001" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">flutter-pi + Flutter · Qt 5.15.3</text>
+<text x="1162" y="727.4000000000001" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">PipeWire 1.6.8（PA 兼容 6001/4713）</text>
+<rect x="1152" y="765.0" width="376" height="77.80000000000001" rx="5" fill="#ffffff" stroke="#e0cf96" stroke-width="1"/>
+<text x="1162" y="782.0" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933" font-weight="700">系统与网络服务</text>
+<text x="1162" y="798.6" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">systemd · NM · hostapd/dnsmasq · mosquitto</text>
+<text x="1162" y="815.2" font-family="Noto Sans CJK SC" font-size="11.8" fill="#1f2933">ptp4l/chrony · can-utils</text>
 <text x="120" y="998" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">① 板内（iceoryx/DDS）：task_engine→★SetMcAction/velocity ↓ · mc/common/state★ ↑</text>
 <line x1="185" y1="1004" x2="647" y2="1004" stroke="#35495e" stroke-width="1.6"/><polygon points="647,1004 638,1008 638,1000" fill="#35495e"/><polygon points="185,1004 194,1000 194,1008" fill="#35495e"/>
 <text x="120" y="1022" font-family="Noto Sans CJK SC" font-size="10.8" fill="#1f2933">② 跨板·任务与感知（FastDDS 域0 · 10.1.1.0/24）：FollowTaskCtrl/★navi 指令 ↓ · follow_candidates★/点云/代价图//odom·/tf ↑</text>

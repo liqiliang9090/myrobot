@@ -251,21 +251,23 @@ t, endy = text_block(px + CELL_PAD + 10, HW_Y + (HW_H - 17 * len(hw_c3)) // 2 + 
 S.append(t)
 assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
 
-# ---------- 工具链纵贯列（开发工具 / 调测工具 / 三方依赖包） ----------
-S.append(box(TC_X, BOARD_Y0, TC_W, BOARD_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
+# ---------- 工具链纵贯列（开发工具 / 调测工具 / 运维链 / 三方依赖包） ----------
+S.append(box(TC_X, BOARD_Y0, TC_W, HW_BOT - BOARD_Y0, '#fffdf4', '#c9a24b', 1.2, rx=10))
 t, _ = text_block(0, BOARD_Y0 + 22, [('◆ 工具链（纵贯两板 · 版本见 §6.1）', True)], fs=13,
                   color='#7a5c14', center=TC_X + TC_W // 2, maxw=TC_W - 20)
 S.append(t)
 GAP = 10
 gy = BOARD_Y0 + 36
+TC_BOT = HW_BOT                       # 工具链框底边与硬件层底对齐（不超出）
 
-def group_box(x, y, w, h, title, lines, stroke='#d8c48a'):
+def group_box(x, y, w, title, lines, stroke='#d8c48a'):
+    """内容自适应高度的组框：刚好包住文字（上下各留 8px）"""
+    h = 16 + 16.6 * (1 + len(lines)) + 12
     S.append(box(x, y, w, h, '#ffffff', stroke, 1, rx=5))
-    content_h = 15 + int(16.6 * (1 + len(lines)))
-    ty = y + max(14, (h - content_h) // 2 + 15)
-    t, _ = text_block(x + 10, ty, [(title, True)] + [(l, False) for l in lines],
+    t, _ = text_block(x + 10, y + 17, [(title, True)] + [(l, False) for l in lines],
                       fs=11.8, lh=16.6, maxw=w - 20)
     S.append(t)
+    return h
 
 top_boxes = [
  ('◆ 开发工具', ['colcon+CMake 工作空间 · AimRT RPC 代码生成', 'Rust 工具链（orin cargo/rustup）']),
@@ -277,21 +279,28 @@ dep_groups = [
  ('UI 与音频', ['flutter-pi + Flutter · Qt 5.15.3', 'PipeWire 1.6.8（PA 兼容 6001/4713）']),
  ('系统与网络服务', ['systemd · NM · hostapd/dnsmasq · mosquitto', 'ptp4l/chrony · can-utils']),
 ]
-TB_H = 150
-wrapper_h = (BOARD_BOT - gy) - TB_H * 2 - GAP * 2
-for title, lines in top_boxes:
-    group_box(TC_X + 8, gy, TC_W - 16, TB_H, title, lines)
-    gy += TB_H + GAP
-# 「三方依赖包」大框：把三组依赖包在一起
-S.append(box(TC_X + 4, gy, TC_W - 8, wrapper_h, 'none', '#b08e30', 1.6, rx=8))
-t, _ = text_block(0, gy + 18, [('◆ 三方依赖包', True)], fs=12.5, color='#7a5c14',
+# 高度全按内容计算；块间空隙均分铺满列高
+TB = [16 + 16.6 * (1 + len(l)) + 12 for _, l in top_boxes]
+SUB = [16 + 16.6 * (1 + len(l)) + 12 for _, l in dep_groups]
+DW = 26                                              # 三方依赖包标题带
+wrap_h = DW + sum(SUB) + GAP * (len(dep_groups) - 1) + 10
+vspace = (TC_BOT - 12 - gy) - (sum(TB) + wrap_h)
+vgap = vspace // len(top_boxes)                      # 3 个块间隙（末块后留底部余量）
+assert vgap >= 8, f'工具链列纵向溢出（间隙 {vgap}px）'
+for (title, lines), h in zip(top_boxes, TB):
+    group_box(TC_X + 8, gy, TC_W - 16, title, lines)
+    gy += h + vgap
+# 「三方依赖包」大框：紧包三组依赖子框
+gy -= vgap                                           # 回退一个间隙，紧贴上一块
+S.append(box(TC_X + 4, gy, TC_W - 8, wrap_h, 'none', '#b08e30', 1.6, rx=8))
+t, _ = text_block(0, gy + 17, [('◆ 三方依赖包', True)], fs=12.5, color='#7a5c14',
                   center=TC_X + TC_W // 2, maxw=TC_W - 20)
 S.append(t)
-sy = gy + 30
-sub_h = (wrapper_h - 30 - 8 - GAP * (len(dep_groups) - 1)) // len(dep_groups)
-for title, lines in dep_groups:
-    group_box(TC_X + 12, sy, TC_W - 24, sub_h, title, lines, stroke='#e0cf96')
-    sy += sub_h + GAP
+sy = gy + DW
+for (title, lines), h in zip(dep_groups, SUB):
+    group_box(TC_X + 12, sy, TC_W - 24, title, lines, stroke='#e0cf96')
+    sy += h + GAP
+assert sy - GAP + 2 <= gy + wrap_h, '三方依赖包纵向溢出'
 
 # ---------- ①②③通信线（图底部） ----------
 c1c, c2c, c3c = C1_X + C1_W // 2, C2_X + C2_W // 2, C3_X + C3_W // 2
@@ -324,4 +333,4 @@ try:
     cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=2.0)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
-print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 依赖子框高 {sub_h}px')
+print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 工具链块间隙 {vgap}px')
