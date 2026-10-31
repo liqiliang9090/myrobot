@@ -47,10 +47,7 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
         out.append(_head(x1, y1, x2, y2, color))
     return ''.join(out)
 
-S = []
-S.append('<?xml version="1.0" encoding="UTF-8"?>')
-S.append('<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1110" viewBox="0 0 1560 1110">')
-S.append('<rect x="0" y="0" width="1560" height="1110" fill="#ffffff"/>')
+S = []   # 图体元素（svg 开闭标签在末尾按实际画布高拼装）
 
 # ---------- 版面常量 ----------
 LBL_X, LBL_W = 20, 92
@@ -60,7 +57,7 @@ C3_X, C3_W = 796, 320                 # orin
 TC_X, TC_W = 1140, 400                # 工具链（纵贯）
 PAD = 8
 BOARD_Y0, BOARD_TITLE_H, PART_TITLE_H = 96, 30, 24
-ROW_H = [455, 74, 74, 66]             # 业务(模块框化)/框架/OS/驱动（部分框内四层）
+ROW_H = [530, 78, 78, 70]             # 业务(模块框化)/框架/OS/驱动（部分框内四层）
 HW_H = 88                             # 硬件层（板框内、部分框外）
 EXT_Y, EXT_H = 20, 46
 
@@ -82,7 +79,7 @@ BIZ_COLS = [
   ('task_engine 任务引擎', ['AmRequest 仲裁 · 长任务编排']),
   ('SM 状态机', ['sm/system_state · SmNodeService 驱动各应用']),
   ('交互表现', ['audio_manager（★播放/音量）· display_ui 胸屏', 'lumina 灯效 · scene_engine 场景']),
-  ('运维链', ['hds · cloud_proxy · ota · data_exporter · drp · abox']),
+  ('运维链', ['hds · cloud_proxy · ota · data_exporter', 'drp · abox']),
   ('传感与外设', ['hal_sensor（★bms/touch · SetServo · 灯语）', 'legged_odom（/odom·/tf）· rk 相机/ToF 实例', '配件：rc · 圈圈 · insta360 · resource_manager']),
   ('板基座', ['sys_guard · iox-roudi · tetherd · secret_store']),
  ],
@@ -104,16 +101,16 @@ fw_c1 = [
  ('推理运行时：ORT · RKNN · MNN · sherpa', False),
 ]
 fw_c2 = [('iceoryx 零拷贝实时通道', False), ('onnxruntime 实时推理', False)]
-fw_c3 = [('ROS2+Nav2 框架 · TensorRT 10.7+CUDA12.6+cuDNN', False), ('OpenCV · AimRT · em/process_manager1', False)]
+fw_c3 = [('ROS2+Nav2 框架', False), ('TensorRT 10.7 + CUDA 12.6 + cuDNN 9.3', False), ('OpenCV · AimRT · em/process_manager1', False)]
 os_c1 = [('Ubuntu 22.04.5（6.1.141）· systemd（em+robot.slice）', False),
          ('PipeWire · NM/hostapd/dnsmasq · mosquitto', False),
          ('ptp4l + chrony 时钟同步', False)]
 os_c2 = [('与左列同板共享内核（无 PREEMPT_RT）', False),
          ('实时性 = isolcpus=2,3', False),
          ('+ SCHED_RR 80/85（§2.4）', False)]
-os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）· systemd', False),
-         ('NV 多媒体栈（NVDEC/NVENC/NVJPG/VIC/OFA）', False),
-         ('ptp4l 时钟同步', False)]
+os_c3 = [('Ubuntu + L4T R36.4.4（JetPack 6.2）', False),
+         ('systemd · NV 多媒体栈', False),
+         ('（NVDEC/NVENC/NVJPG/VIC/OFA）· ptp4l', False)]
 dr_c1 = [('Mali kbase · RKNPU v0.9.8 · CAN · stmmac+YT9215RB', False), ('V4L2/USB 相机 · I2C/SPI/UART · MPP/RGA', False)]
 dr_c2 = [('CAN0/1 驱动（硬中断 irq83/84 @CPU2）', False)]
 dr_c3 = [('nvgpu 540.4.0 · V4L2/NvArgus · GMSL 相机', False),
@@ -171,18 +168,22 @@ for px, pw, pname, pfill, pstroke in PARTS:
     S.append(t)
 
 # 具身业务层：每模块独立成框（上=对外接口/依赖方，下=被依赖底座/数据源）
+# 可读性口径：文档正文里整图缩至 ~0.65×（PNG 0.43×），故模块框用衬底+深色粗边+大字号
 def draw_module(px, pw, y, title, lines):
-    h = 17 + int(16.5 * len(lines)) + 9
-    S.append(box(px + 6, y, pw - 12, h, '#ffffff', '#9db3c8', 1, rx=5))
-    t, _ = text_block(px + 16, y + 15, [(title, True)] + [(l, False) for l in lines],
-                      fs=11.6, maxw=pw - 26)
+    TH, TLH = 19, 17                   # 标题行高 / 内容行高
+    h = 8 + TH + TLH * len(lines) + 6
+    S.append(box(px + 6, y, pw - 12, h, '#e9f2fc', '#4f7396', 2, rx=5))
+    t, _ = text_block(px + 15, y + 21, [(title, True)], fs=13.6, color='#17456e', maxw=pw - 24)
     S.append(t)
-    return y + h + 4
+    t, _ = text_block(px + 15, y + 21 + TH, [(l, False) for l in lines],
+                      fs=12.6, color='#2c3a47', maxw=pw - 24)
+    S.append(t)
+    return y + h + 5
 
 yt = row_y[0]
 S.append(box(LBL_X, yt, LBL_W, ROW_H[0], LBL_FILLS[0], '#9aa8b5', 1))
-t, _ = text_block(0, yt + ROW_H[0] // 2 + 4, [('具身业务层', True)], fs=12, color='#33414e',
-                  center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
+t, _ = text_block(0, yt + ROW_H[0] // 2 + 4, [('具身业务层', True)], fs=13, color='#33414e',
+                  center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 for ci, (px, pw, *_ ) in enumerate(PARTS):
     S.append(box(px, yt, pw, ROW_H[0], '#f7fafe', '#a8b4c0', 1))
@@ -191,27 +192,27 @@ for ci, (px, pw, *_ ) in enumerate(PARTS):
         y = draw_module(px, pw, y, title, lines)
     assert y <= yt + ROW_H[0] + 4, f'业务层模块纵向溢出(列{ci})'
 
-# 其余三层单元格（三列共享行坐标）
+# 其余三层单元格（三列共享行坐标；row_y[0] 为业务行，框架/OS/驱动自 row_y[1] 起）
 for ri, (lname, cont) in enumerate(ROWS):
-    yt = row_y[ri]; h = ROW_H[ri]
+    yt = row_y[ri + 1]; h = ROW_H[ri + 1]
     S.append(box(LBL_X, yt, LBL_W, h, LBL_FILLS[ri + 1], '#9aa8b5', 1))
-    t, _ = text_block(0, yt + h // 2 + 4, [(lname, True)], fs=12, color='#33414e',
-                      center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
+    t, _ = text_block(0, yt + h // 2 + 4, [(lname, True)], fs=13, color='#33414e',
+                      center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
     S.append(t)
     for ci, (px, pw, *_ ) in enumerate(PARTS):
         S.append(box(px, yt, pw, h, FILLS[ri], '#a8b4c0', 1))
-        t, endy = text_block(px + 10, yt + 18, cont[ci], fs=11.6, maxw=pw - 20)
+        t, endy = text_block(px + 10, yt + 19, cont[ci], fs=12.2, maxw=pw - 18)
         S.append(t)
         assert endy <= yt + h + 6, f'{lname} 纵向溢出'
 
 # 硬件层（板框内、部分框外）
 S.append(box(LBL_X, HW_Y, LBL_W, HW_H, LBL_FILLS[4], '#9aa8b5', 1))
-t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=12, color='#33414e',
-                  center=LBL_X + LBL_W // 2, maxw=LBL_W - 14)
+t, _ = text_block(0, HW_Y + HW_H // 2 + 4, [('硬件层', True)], fs=13, color='#33414e',
+                  center=LBL_X + LBL_W // 2, maxw=LBL_W - 10)
 S.append(t)
 for px, pw, cont in ((C1_X, C1_W, hw_c1), (C2_X, C2_W, hw_c2), (C3_X, C3_W, hw_c3)):
     S.append(box(px, HW_Y, pw, HW_H, HW_FILL, '#a8b4c0', 1))
-    t, endy = text_block(px + 10, HW_Y + 18, cont, fs=11.6, maxw=pw - 20)
+    t, endy = text_block(px + 10, HW_Y + 19, cont, fs=12.2, maxw=pw - 18)
     S.append(t)
     assert endy <= HW_Y + HW_H + 6, '硬件层纵向溢出'
 
@@ -235,10 +236,10 @@ GAP = 6
 gh = (BOARD_BOT - gy - GAP * (len(groups) - 1)) // len(groups)   # 动态铺满整列
 for title, lines in groups:
     S.append(box(TC_X + 8, gy, TC_W - 16, gh, '#ffffff', '#d8c48a', 1, rx=5))
-    content_h = 15 + int(16.2 * (1 + len(lines)))
+    content_h = 15 + int(16.6 * (1 + len(lines)))
     ty = gy + max(14, (gh - content_h) // 2 + 15)
     t, endy = text_block(TC_X + 18, ty, [(title, True)] + [(l, False) for l in lines],
-                         fs=11.4, lh=16, maxw=TC_W - 36)
+                         fs=11.8, lh=16.6, maxw=TC_W - 32)
     S.append(t)
     gy += gh + GAP
 
@@ -258,15 +259,19 @@ t, _ = text_block(LBL_X, BOARD_BOT + 110, [
     ('图例：箭头①②③＝板内/跨板数据流（★为官方接口）；虚线＝工具链注入（运行时库/构建产物/调测工具）；层间自上而下＝上层依赖下层。', False),
     ('业务层模块框序：自上而下＝依赖方向（上＝对外接口/依赖方，下＝被依赖底座与数据源）。', False),
     ('列内链：运控列自上而下＝mc→CAN 驱动→14 执行器（1kHz 实时环）；orin 板内相机/ToF 原图经 iceoryx 直供感知融合（§4.0）。', False)],
-    fs=11, color='#5b6b7a', lh=16)
+    fs=11.2, color='#5b6b7a', lh=16.6)
 S.append(t)
 
 S.append('</svg>')
-out = '\n'.join(S)
+H = BOARD_BOT + 176                                   # 底部通信线 78 + 图例 3 行 + 边距
+head = ['<?xml version="1.0" encoding="UTF-8"?>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="{H}" viewBox="0 0 1560 {H}">',
+        f'<rect x="0" y="0" width="1560" height="{H}" fill="#ffffff"/>']
+out = '\n'.join(head + S)
 open('figures/fig-7-1-layered-arch.svg', 'w', encoding='utf-8').write(out)
 try:
     import cairosvg
-    cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=1.5)
+    cairosvg.svg2png(url='figures/fig-7-1-layered-arch.svg', write_to='figures/fig-7-1-layered-arch.png', scale=2.0)
 except Exception as e:
     print('PNG 跳过（无 cairosvg）:', e)
-print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 板底 {BOARD_BOT}px, 组框高 {gh}px')
+print(f'OK -> figures/fig-7-1-layered-arch.svg  ({len(out)} bytes, 画布 1560×{H}, 板底 {BOARD_BOT}px, 组框高 {gh}px')
