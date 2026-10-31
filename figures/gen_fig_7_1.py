@@ -50,7 +50,7 @@ def arrow(x1, y1, x2, y2, color='#35495e', both=True, dash='', sw=1.6):
 S = []   # 图体元素（svg 开闭标签在末尾按实际画布高拼装）
 
 # ---------- 版面常量 ----------
-LBL_X, LBL_W = 20, 84
+LBL_X, LBL_W = 6, 84
 C1_X, C1_W = 116, 378                 # rk·交互业务
 C2_X, C2_W = 506, 282                 # rk·运控
 C3_X, C3_W = 810, 320                 # orin（右移 14：与运控板框留 6px 间隙）
@@ -172,7 +172,7 @@ PARTS = [(C1_X, C1_W, '交互业务（非实时）', '#f2f7fc', '#8aa8c4'),
          (C2_X, C2_W, '运控（实时 | 隔离核）', '#fdf1ea', '#c49a82'),
          (C3_X, C3_W, '复杂感知与规划', '#f6f0fb', '#a48ec4')]
 for px, pw, pname, pfill, pstroke in PARTS:
-    S.append(box(px, PART_Y, pw, PART_BOT - PART_Y, pfill, pstroke, 3.2, rx=8))   # 部分框边框加粗（再加强）
+    S.append(box(px, PART_Y, pw, PART_BOT - PART_Y, pfill, pstroke, 4.5, rx=8))   # 部分框边框加粗（第三档）
     t, _ = text_block(0, PART_Y + 20, [(pname, True)], fs=12.5, color='#33414e',
                       center=px + pw // 2, maxw=pw - 12)   # 部分名在部分框顶部条带
     S.append(t)
